@@ -1,11 +1,15 @@
+use std::io;
+
 use clap::Parser;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
+use crate::packet::{MirrorPacket, PacketError};
 
 mod config;
+mod packet;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -17,24 +21,26 @@ struct Args {
 
 async fn work_task(mut socket: TcpStream) {
     let address = socket.peer_addr().unwrap();
-    let mut buf = [0u8; 1024];
+    info!("Connected to '{}'", address);
+
+    MirrorPacket::Ping.write(&mut socket).await.unwrap();
+    debug!("Sent ping!");
 
     loop {
-        match socket.read(&mut buf).await {
-            Ok(0) => {
-                info!("Peer {} disconnected", address);
+        match MirrorPacket::read(&mut socket).await {
+            Ok(MirrorPacket::Ping) => {
+                debug!("Received Ping!");
+            }
+            Err(PacketError::UnkownError) => {
+                error!("Protocol error");
                 return;
             }
-            Ok(n) => {
-                info!("Pong from {}", address);
-                // Echo the message back to the client.
-                if let Err(e) = socket.write_all(&buf[..n]).await {
-                    error!("Failed to write to socket: {}", e);
-                    return;
-                }
+            Err(PacketError::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => {
+                info!("Disconnected from '{}'", address);
+                return;
             }
-            Err(e) => {
-                error!("Failed to read from socket: {}", e);
+            Err(error) => {
+                error!("IoError: {error}");
                 return;
             }
         }
@@ -80,8 +86,7 @@ async fn main() -> anyhow::Result<()> {
 
     loop {
         // Handle incoming connections.
-        let (socket, address) = listener.accept().await?;
-        info!("New connection: {}", address);
+        let (socket, _) = listener.accept().await?;
 
         // Dispatch into a separate task.
         tokio::spawn(work_task(socket));
