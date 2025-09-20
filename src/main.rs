@@ -1,10 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use clap::Parser;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
@@ -12,7 +11,6 @@ use tracing::{debug, error, info, warn};
 use crate::config::Config;
 use crate::packet::{MirrorPacket, PacketError};
 use crate::peer::{Peer, PeerTable};
-use crate::renderer::Renderer;
 
 mod config;
 mod packet;
@@ -20,11 +18,7 @@ mod peer;
 mod renderer;
 mod scene;
 
-async fn peer_task(
-    peer_table: Arc<Mutex<HashMap<SocketAddr, Peer>>>,
-    socket: TcpStream,
-    listen_port: u16,
-) {
+async fn peer_task(peer_table: PeerTable, socket: TcpStream, listen_port: u16) -> () {
     let peer_address = socket.peer_addr().unwrap();
     info!("Connected to '{}'", peer_address);
     let (mut read_socket, mut write_socket) = socket.into_split();
@@ -48,6 +42,19 @@ async fn peer_task(
         }
     };
 
+    // 3. Send known peers.
+    let peer_vec = peer_table
+        .lock()
+        .await
+        .values()
+        .map(|peer| peer.listen_addr)
+        .collect();
+    debug!("PeerVec: {:?}", peer_vec);
+    MirrorPacket::GossipPeers(peer_vec)
+        .write(&mut write_socket)
+        .await
+        .unwrap();
+
     // 3. Register peer into the routing table
     let listen_addr = SocketAddr::new(peer_address.ip(), peer_listen_port);
     peer_table.lock().await.insert(
@@ -57,17 +64,32 @@ async fn peer_task(
             listen_addr,
         },
     );
-
     debug!("PeerTable: {:?}", peer_table.lock().await.keys());
 
-    // 4. Proceed with normal flow.
+    // 5. Proceed with normal flow.
     loop {
         match MirrorPacket::read(&mut read_socket).await {
             Ok(MirrorPacket::Hello(_)) => {
                 // Whilst the remote peer is connected, it's unexpected for it
                 // to change its listening port.
-                error!("Unexpected Hello packet. Closing connection.");
-                return;
+                warn!("Unexpected Hello packet.");
+                continue;
+            }
+            Ok(MirrorPacket::GossipPeers(new_peers)) => {
+                info!("Peer wants us to connect to {:?}", new_peers);
+                // For each new peer, try to create connection.
+                for peer_address in new_peers {
+                    let Ok(new_socket) = TcpStream::connect(peer_address).await else {
+                        warn!("Could not connect to peer {}", peer_address);
+                        continue;
+                    };
+                    // Dispatch into a separate task.
+                    // tokio::spawn(async move {
+                    //     peer_task(peer_table.clone(), new_socket, listen_port).await
+                    // });
+                }
+
+                info!("Added new peers")
             }
             Err(PacketError::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => {
                 info!("Disconnected from '{}'", peer_address);
@@ -80,6 +102,10 @@ async fn peer_task(
         }
     }
 }
+
+fn assert_send_sync<T: Send + Sync>(_: T) {}
+fn assert_send<T: Send>(_: T) {}
+fn assert_sync<T: Sync>(_: T) {}
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
