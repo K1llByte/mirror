@@ -1,133 +1,20 @@
 use std::collections::HashMap;
-use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use clap::Parser;
-use core::future::Future;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{info, trace, warn};
 
 use crate::config::Config;
-use crate::packet::{MirrorPacket, PacketError};
-use crate::peer::{Peer, PeerTable};
+use crate::peer::{Peer, peer_task};
 
 mod config;
 mod packet;
 mod peer;
-mod renderer;
-mod scene;
-
-fn peer_task(
-    peer_table: PeerTable,
-    socket: TcpStream,
-    listen_port: u16,
-) -> impl Future<Output = ()> + Send {
-    async move {
-        let local_ip = socket.local_addr().unwrap().ip();
-        let peer_address = socket.peer_addr().unwrap();
-        info!("Connected to '{}'", peer_address);
-        let (mut read_socket, mut write_socket) = socket.into_split();
-
-        // 1. Send Hello packet with the listening port of this peer.
-        MirrorPacket::Hello(listen_port)
-            .write(&mut write_socket)
-            .await
-            .unwrap();
-        debug!("Sent Hello({listen_port})!");
-
-        // 2. Receive Hello packet from remote peer.
-        let peer_listen_port = match MirrorPacket::read(&mut read_socket).await {
-            Ok(MirrorPacket::Hello(peer_listen_port)) => {
-                debug!("Received Hello({peer_listen_port})!");
-                peer_listen_port
-            }
-            _ => {
-                error!("Unexpected protocol behaviour. Closing connection.");
-                return;
-            }
-        };
-
-        // 3. Send known peers.
-        let peer_vec = peer_table
-            .lock()
-            .await
-            .values()
-            .map(|peer| peer.listen_addr)
-            .collect();
-        debug!("PeerVec: {:?}", peer_vec);
-        MirrorPacket::GossipPeers(peer_vec)
-            .write(&mut write_socket)
-            .await
-            .unwrap();
-
-        // 4. Register peer into the routing table
-        let listen_addr = SocketAddr::new(peer_address.ip(), peer_listen_port);
-        peer_table.lock().await.insert(
-            peer_address,
-            Peer {
-                write_socket: write_socket,
-                listen_addr,
-            },
-        );
-        debug!(
-            "PeerTable: {:?}",
-            peer_table
-                .lock()
-                .await
-                .iter()
-                .map(|(k, v)| (k, v.listen_addr))
-                .collect::<Vec<_>>()
-        );
-
-        // 5. Proceed with normal flow.
-        'outer: loop {
-            match MirrorPacket::read(&mut read_socket).await {
-                Ok(MirrorPacket::Hello(_)) => {
-                    // Whilst the remote peer is connected, it's unexpected for it
-                    // to change its listening port.
-                    warn!("Unexpected Hello packet.");
-                    continue;
-                }
-                Ok(MirrorPacket::GossipPeers(new_peers)) => {
-                    info!("Peer wants us to connect to {:?}", new_peers);
-                    // For each new peer, try to create connection.
-                    for peer_address in new_peers {
-                        if peer_table
-                            .lock()
-                            .await
-                            .values()
-                            .map(|peer| peer.listen_addr)
-                            .any(|a| {
-                                a == peer_address || a == SocketAddr::new(local_ip, listen_port)
-                            })
-                        {
-                            continue;
-                        }
-
-                        let Ok(new_socket) = TcpStream::connect(peer_address).await else {
-                            warn!("Could not connect to peer {}", peer_address);
-                            continue;
-                        };
-                        // Dispatch into a separate task.
-                        tokio::spawn(peer_task(peer_table.clone(), new_socket, listen_port));
-                    }
-                }
-                Err(PacketError::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => {
-                    info!("Disconnected from '{}'", peer_address);
-                    break 'outer;
-                }
-                Err(error) => {
-                    error!("IoError: {error}");
-                    break 'outer;
-                }
-            }
-        }
-
-        peer_table.lock().await.remove(&peer_address);
-    }
-}
+// mod renderer;
+// mod scene;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
