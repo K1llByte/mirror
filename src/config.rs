@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{net::SocketAddr, path::Path, str::FromStr};
 
 use serde::Deserialize;
 use thiserror::Error;
@@ -6,12 +6,12 @@ use thiserror::Error;
 #[derive(Deserialize)]
 pub struct Config {
     #[serde(default = "default_host")]
-    pub host: String,
-    pub bootstrap_peers: Vec<String>,
+    pub host: SocketAddr,
+    pub bootstrap_peers: Vec<SocketAddr>,
 }
 
-fn default_host() -> String {
-    "0.0.0.0:2020".into()
+fn default_host() -> SocketAddr {
+    SocketAddr::from_str("0.0.0.0:2020").unwrap()
 }
 
 #[derive(Debug, Error)]
@@ -35,7 +35,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            host: "127.0.0.1:2020".into(),
+            host: default_host(),
             bootstrap_peers: vec![],
         }
     }

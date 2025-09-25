@@ -5,10 +5,10 @@ use std::sync::Arc;
 use clap::Parser;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
-use tracing::{info, trace, warn};
+use tracing::{info, warn};
 
 use crate::config::Config;
-use crate::peer::{Peer, peer_task};
+use crate::peer::{Peer, connect_to_peers, peer_task};
 
 mod config;
 mod packet;
@@ -56,20 +56,32 @@ async fn main() -> anyhow::Result<()> {
 
     // Connect to bootstrap peers.
     info!("Connecting to bootstrap peers");
-    for peer_address in &config.bootstrap_peers {
-        let Ok(socket) = TcpStream::connect(peer_address).await else {
-            warn!("Could not connect to bootstrap peer {}", peer_address);
-            continue;
-        };
-        // Dispatch into a separate task.
-        tokio::spawn(peer_task(peer_table.clone(), socket, listen_port));
-    }
+    connect_to_peers(
+        config.bootstrap_peers,
+        peer_table.clone(),
+        listen_port,
+        "Bootstrap",
+    )
+    .await;
+    // for peer_address in &config.bootstrap_peers {
+    //     let Ok(socket) = TcpStream::connect(peer_address).await else {
+    //         warn!("Could not connect to bootstrap peer {}", peer_address);
+    //         continue;
+    //     };
+    //     // Dispatch into a separate task.
+    //     tokio::spawn(peer_task(
+    //         peer_table.clone(),
+    //         socket,
+    //         listen_port,
+    //         "Bootstrap",
+    //     ));
+    // }
 
     loop {
         // Handle incoming connections.
         let (socket, _) = listener.accept().await?;
 
         // Dispatch into a separate task.
-        tokio::spawn(peer_task(peer_table.clone(), socket, listen_port));
+        tokio::spawn(peer_task(peer_table.clone(), socket, listen_port, "Listen"));
     }
 }
