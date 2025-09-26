@@ -1,23 +1,55 @@
 use std::fmt::Display;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{collections::HashMap, io};
 
 use core::future::Future;
+use glam::Vec3;
 use tokio::net::tcp::OwnedWriteHalf;
-use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio::sync::Mutex;
-use tokio::task::{self, Id};
+use tokio::task::{self};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::packet::{MirrorPacket, PacketError};
+use crate::scene::{Camera, Scene, Sphere};
 
 pub type PeerTable = Arc<Mutex<HashMap<SocketAddr, Peer>>>;
 
 #[derive(Debug)]
 pub struct Peer {
     pub write_socket: OwnedWriteHalf,
+}
+
+pub async fn listen_task(
+    peer_table: PeerTable,
+    host: impl ToSocketAddrs + Display,
+    bootstrap_peers: Vec<SocketAddr>,
+) -> io::Result<()> {
+    // Bind listener address
+    let listener = TcpListener::bind(&host).await?;
+    let listen_port = listener.local_addr()?.port();
+    info!("Server listening on {}", &host);
+
+    // Connect to bootstrap peers.
+    info!("Connecting to bootstrap peers ...");
+    connect_to_peers(
+        bootstrap_peers,
+        peer_table.clone(),
+        listen_port,
+        "Bootstrap",
+    )
+    .await;
+
+    loop {
+        // Handle incoming connections.
+        let (socket, _) = listener.accept().await?;
+
+        // Dispatch into a separate task.
+        tokio::spawn(peer_task(peer_table.clone(), socket, listen_port, "Listen"));
+    }
 }
 
 pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
@@ -59,6 +91,51 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
         // Dispatch into a separate task.
         tokio::spawn(peer_task(peer_table.clone(), socket, listen_port, tag));
     }
+}
+
+pub async fn peer_write_task(peer_table: PeerTable, peer_listen_address: SocketAddr) {
+    const SECS: u64 = 5;
+    for s in 0..SECS {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        debug!("Sending scene in {}", SECS - s);
+    }
+    debug!("HELLO WORLD!");
+
+    let sphere_left = Sphere {
+        position: Vec3::new(-1.0, 0.0, -1.0),
+        radius: 0.5,
+    };
+    let sphere_center = Sphere {
+        position: Vec3::new(0.0, 0.0, -1.0),
+        radius: 0.5,
+    };
+    let sphere_right = Sphere {
+        position: Vec3::new(1.0, 0.0, -1.0),
+        radius: 0.5,
+    };
+    let sphere_ground = Sphere {
+        position: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+    };
+
+    // Scene
+    let scene = Scene {
+        camera: Camera {
+            position: Vec3::ZERO,
+            width: 400f32,
+            height: 300f32,
+        },
+        objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
+    };
+
+    let mut peer_table_guard = peer_table.lock().await;
+    let Some(peer) = peer_table_guard.get_mut(&peer_listen_address) else {
+        return;
+    };
+    MirrorPacket::SyncScene(scene)
+        .write(&mut peer.write_socket)
+        .await
+        .expect("This is supposed to work since im just testing");
 }
 
 pub fn peer_task(
@@ -139,6 +216,9 @@ pub fn peer_task(
                 .unwrap()
         }
 
+        // FIXME: Temporary
+        tokio::spawn(peer_write_task(peer_table.clone(), peer_listen_address));
+
         // 5. Proceed with normal flow.
         'outer: loop {
             match MirrorPacket::read(&mut read_socket).await {
@@ -166,6 +246,9 @@ pub fn peer_task(
                             .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
                             .collect::<Vec<_>>()
                     );
+                }
+                Ok(MirrorPacket::SyncScene(scene)) => {
+                    debug!("[{tag}, {}] Received scene: {:?}", task::id(), scene);
                 }
                 Err(PacketError::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => {
                     debug!(

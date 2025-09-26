@@ -6,12 +6,25 @@ use bincode::{Decode, Encode, config, decode_from_slice};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
+use crate::scene::Scene;
+
+/// Represents the main control packet used in the peer-to-peer network.
 #[derive(Debug, Encode, Decode)]
 pub enum MirrorPacket {
+    /// Initial 'hello' handshake packet type, sent during the initial
+    /// handshake phase to inform a peer of the sender’s active listening port.
+    /// This port can then be shared with other peers to help them join the
+    /// network.
     Hello(u16),
+    /// Gossip protocol packet type, used to distribute a list of known peer
+    /// socket addresses, helping peers build and maintain an up-to-date view
+    /// of the network.
     GossipPeers(Vec<SocketAddr>),
-    // RenderTileRequest
-    // RenderTileResponse
+    /// Scene synchronization packet type, used to synchronize scene between
+    /// useful network peers before RenderTileRequest.
+    SyncScene(Scene),
+    // TODO: RenderTileRequest
+    // TODO: RenderTileResponse
 }
 
 #[derive(Debug, Error)]
