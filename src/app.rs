@@ -22,6 +22,7 @@ impl eframe::App for MirrorApp {
         // Force a repaint every second
         ctx.request_repaint_after(Duration::from_secs(1));
 
+        // Build ui
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Mirror Network");
 
