@@ -21,6 +21,7 @@ pub type PeerTable = Arc<Mutex<HashMap<SocketAddr, Peer>>>;
 #[derive(Debug)]
 pub struct Peer {
     pub write_socket: OwnedWriteHalf,
+    pub name: Option<String>,
 }
 
 pub async fn listen_task(
@@ -155,14 +156,14 @@ pub fn peer_task(
         let (mut read_socket, mut write_socket) = socket.into_split();
 
         // 1. Send Hello packet with the listening port of this peer.
-        MirrorPacket::Hello(listen_port)
+        MirrorPacket::Hello(None, listen_port)
             .write(&mut write_socket)
             .await
             .unwrap();
 
         // 2. Receive Hello packet from remote peer.
-        let peer_listen_port = match MirrorPacket::read(&mut read_socket).await {
-            Ok(MirrorPacket::Hello(peer_listen_port)) => peer_listen_port,
+        let (peer_name, peer_listen_port) = match MirrorPacket::read(&mut read_socket).await {
+            Ok(MirrorPacket::Hello(peer_name, peer_listen_port)) => (peer_name, peer_listen_port),
             _ => {
                 error!(
                     "[{tag}, {}] - Unexpected protocol behaviour. Refused handshake.",
@@ -193,7 +194,13 @@ pub fn peer_task(
             }
 
             // 3. Register peer into the peer table
-            peer_table_guard.insert(peer_listen_address, Peer { write_socket });
+            peer_table_guard.insert(
+                peer_listen_address,
+                Peer {
+                    name: peer_name,
+                    write_socket,
+                },
+            );
             // Once its added to the peer table, its considered connected to the network.
             trace!("[{tag}, {}] - Connected to '{}'", task::id(), peer_address);
             let peer_vec = peer_table_guard.keys().cloned().collect();
@@ -217,12 +224,12 @@ pub fn peer_task(
         }
 
         // FIXME: Temporary
-        tokio::spawn(peer_write_task(peer_table.clone(), peer_listen_address));
+        // tokio::spawn(peer_write_task(peer_table.clone(), peer_listen_address));
 
         // 5. Proceed with normal flow.
         'outer: loop {
             match MirrorPacket::read(&mut read_socket).await {
-                Ok(MirrorPacket::Hello(_)) => {
+                Ok(MirrorPacket::Hello(_, _)) => {
                     // Whilst the remote peer is connected, it's unexpected for it
                     // to change its listening port.
                     warn!("[{tag}, {}] - Unexpected Hello packet.", task::id());

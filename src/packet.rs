@@ -12,10 +12,10 @@ use crate::scene::Scene;
 #[derive(Debug, Encode, Decode)]
 pub enum MirrorPacket {
     /// Initial 'hello' handshake packet type, sent during the initial
-    /// handshake phase to inform a peer of the sender’s active listening port.
-    /// This port can then be shared with other peers to help them join the
-    /// network.
-    Hello(u16),
+    /// handshake phase to inform a peer of the sender’s name and active
+    /// listening port. This port can then be shared with other peers to help
+    /// them join the network.
+    Hello(Option<String>, u16),
     /// Gossip protocol packet type, used to distribute a list of known peer
     /// socket addresses, helping peers build and maintain an up-to-date view
     /// of the network.
