@@ -8,4 +8,4 @@ EXPOSE 2020
 
 RUN cargo build --release
 
-CMD ["/usr/src/app/target/release/mirror", "-c", "test/peer1.toml", "-n"]
+CMD ["/usr/src/app/target/release/mirror", "-n"]
