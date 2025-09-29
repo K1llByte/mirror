@@ -46,20 +46,6 @@ impl eframe::App for MirrorApp {
                 let image_bytes = Bytes::Shared(Arc::new([255u8; 400 * 300 * 3]));
                 let image_data = ColorImage::from_rgb(IMAGE_SIZE, image_bytes.as_ref());
 
-                // LOADING IMAGE //
-                // let image_data = std::fs::read("triangle.png").unwrap();
-                // let dyn_img = image::load_from_memory(&image_data).unwrap().to_rgba8();
-                // let size = [dyn_img.width() as usize, dyn_img.height() as usize];
-
-                // let image_data = ColorImage {
-                //     size,
-                //     source_size: Vec2::new(size[0] as f32, size[1] as f32),
-                //     pixels: dyn_img
-                //         .pixels()
-                //         .map(|p| egui::Color32::from_rgba_unmultiplied(p[0], p[1], p[2], p[3]))
-                //         .collect(),
-                // };
-
                 ui.ctx()
                     .load_texture("render_image", image_data, Default::default())
             });
