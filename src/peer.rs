@@ -203,7 +203,11 @@ pub fn peer_task(
             );
             // Once its added to the peer table, its considered connected to the network.
             trace!("[{tag}, {}] - Connected to '{}'", task::id(), peer_address);
-            let peer_vec = peer_table_guard.keys().cloned().collect();
+            let peer_vec = peer_table_guard
+                .keys()
+                .filter(|&pa| *pa != peer_listen_address)
+                .cloned()
+                .collect();
             debug!(
                 "[{tag}, {}] - PeerTable connections: {:?}",
                 task::id(),

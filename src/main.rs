@@ -10,13 +10,14 @@ use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
 use crate::config::Config;
 use crate::peer::{Peer, listen_task};
+use crate::renderer::Renderer;
 
 mod app;
 mod config;
 mod packet;
 mod peer;
+mod renderer;
 mod scene;
-// mod renderer;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -37,8 +38,9 @@ impl FormatTime for CustomTime {
     }
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
+    // Create tokio runtime.
+    let runtime = tokio::runtime::Runtime::new()?;
     // Load command line arguments.
     let args = Args::try_parse()?;
 
@@ -52,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     let config = match &args.config {
         Some(path) => {
             info!("Loaded config from '{}'", path);
-            Config::from_file(&path).await?
+            runtime.block_on(Config::from_file(&path))?
         }
         None => {
             info!("Using default config");
@@ -61,23 +63,21 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let peer_table = Arc::new(Mutex::new(HashMap::<SocketAddr, Peer>::new()));
+    let renderer = Renderer::new(peer_table.clone());
 
-    let listen_task_future = tokio::spawn(listen_task(
-        peer_table.clone(),
-        config.host,
-        config.bootstrap_peers,
-    ));
+    let listen_task_future =
+        runtime.spawn(listen_task(peer_table, config.host, config.bootstrap_peers));
 
     if !args.no_gui {
         let options = eframe::NativeOptions::default();
         eframe::run_native(
             "Mirror App",
             options,
-            Box::new(|_cc| Ok(Box::new(app::MirrorApp::new(peer_table)))),
+            Box::new(|_cc| Ok(Box::new(app::MirrorApp::new(runtime, renderer)))),
         )
         .unwrap();
     } else {
-        listen_task_future.await.unwrap();
+        runtime.block_on(listen_task_future)??;
     }
 
     Ok(())
