@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use eframe::egui::{self, ColorImage, TextureHandle, load::Bytes};
+use eframe::egui::{self, ColorImage, Key, RichText, TextureHandle, load::Bytes};
 use egui_extras::{Column, TableBuilder};
 use futures::FutureExt;
 use tokio::{runtime::Runtime, task::JoinHandle};
@@ -13,6 +13,7 @@ pub struct MirrorApp {
     renderer: Arc<Renderer>,
 
     // Ui data
+    enable_side_panel: bool,
     texture: Option<egui::TextureHandle>,
     render_future: Option<JoinHandle<Vec<u8>>>,
 }
@@ -24,6 +25,7 @@ impl MirrorApp {
             runtime,
             renderer,
             // Ui data
+            enable_side_panel: true,
             texture: None,
             render_future: None,
         }
@@ -73,45 +75,58 @@ impl eframe::App for MirrorApp {
         // Force a repaint every second
         ctx.request_repaint_after(Duration::from_secs_f32(0.1));
 
+        if ctx.input(|i| i.key_pressed(Key::Space)) {
+            self.enable_side_panel = !self.enable_side_panel;
+        }
+
         // Build ui
+        if self.enable_side_panel {
+            egui::SidePanel::left("side_panel").show(ctx, |ui| {
+                ui.heading("Mirror");
+                ui.separator();
+
+                if let Ok(peer_table) = self.renderer.peer_table.try_lock() {
+                    if peer_table.keys().len() == 0 {
+                        ui.label("No connected peers.");
+                    } else {
+                        TableBuilder::new(ui)
+                            .striped(true)
+                            .resizable(false)
+                            .cell_layout(egui::Layout::left_to_right(egui::Align::Min))
+                            .columns(Column::remainder(), 2)
+                            .body(|mut body| {
+                                for (i, address) in peer_table.keys().enumerate() {
+                                    body.row(20.0, |mut row| {
+                                        row.col(|ui| {
+                                            ui.label(format!("peer{i}"));
+                                        });
+                                        row.col(|ui| {
+                                            ui.label(address.to_string());
+                                        });
+                                    });
+                                }
+                            });
+                    }
+                } else {
+                    ui.label("Loading...");
+                }
+
+                ui.separator();
+
+                let render_button =
+                    ui.add_sized([ui.available_width(), 0.0], egui::Button::new("Render"));
+                if render_button.clicked() {
+                    self.render_future = Some(
+                        self.runtime
+                            .spawn(renderer::render_task(self.renderer.clone())),
+                    );
+                }
+            });
+        }
+
         egui::CentralPanel::default().show(ctx, |ui| {
             // Render image to background
             self.show_render_image(ui);
-
-            ui.heading("Mirror Network");
-
-            if let Ok(peer_table) = self.renderer.peer_table.try_lock() {
-                if peer_table.keys().len() == 0 {
-                    ui.label("No connected peers.");
-                } else {
-                    TableBuilder::new(ui)
-                        .striped(true)
-                        .resizable(false)
-                        .cell_layout(egui::Layout::left_to_right(egui::Align::Min))
-                        .columns(Column::remainder(), 2)
-                        .body(|mut body| {
-                            for (i, address) in peer_table.keys().enumerate() {
-                                body.row(20.0, |mut row| {
-                                    row.col(|ui| {
-                                        ui.label(format!("peer{i}"));
-                                    });
-                                    row.col(|ui| {
-                                        ui.label(address.to_string());
-                                    });
-                                });
-                            }
-                        });
-                }
-            } else {
-                ui.label("Loading...");
-            }
-
-            if ui.button("Render").clicked() {
-                self.render_future = Some(
-                    self.runtime
-                        .spawn(renderer::render_task(self.renderer.clone())),
-                );
-            }
         });
     }
 }

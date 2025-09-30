@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use rand::Rng;
-use tracing::{debug, trace};
 
 use crate::{peer::PeerTable, render_image::RenderImage};
 
@@ -96,6 +95,5 @@ pub async fn render_task(renderer: Arc<Renderer> /* , &Scene */) -> Vec<u8> {
         begin_height += RENDER_TILE_MAX_SIZE.1;
     }
 
-    debug!("Finished rendering");
     render_image
 }
