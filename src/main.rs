@@ -16,6 +16,7 @@ mod app;
 mod config;
 mod packet;
 mod peer;
+mod render_image;
 mod renderer;
 mod scene;
 
@@ -63,7 +64,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     let peer_table = Arc::new(Mutex::new(HashMap::<SocketAddr, Peer>::new()));
-    let renderer = Renderer::new(peer_table.clone());
+    let renderer = Arc::new(Renderer::new(peer_table.clone()));
 
     let listen_task_future =
         runtime.spawn(listen_task(peer_table, config.host, config.bootstrap_peers));
@@ -73,7 +74,7 @@ fn main() -> anyhow::Result<()> {
         eframe::run_native(
             "Mirror App",
             options,
-            Box::new(|_cc| Ok(Box::new(app::MirrorApp::new(runtime, renderer)))),
+            Box::new(|_cc| Ok(Box::new(app::MirrorApp::new(runtime, renderer.clone())))),
         )
         .unwrap();
     } else {
