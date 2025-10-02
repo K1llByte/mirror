@@ -273,6 +273,7 @@ pub fn peer_task(
                     error!("[{tag}, {}] - IoError: {error}", task::id());
                     break 'outer;
                 }
+                _ => {}
             }
         }
 

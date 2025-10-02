@@ -23,8 +23,12 @@ pub enum MirrorPacket {
     /// Scene synchronization packet type, used to synchronize scene between
     /// useful network peers before RenderTileRequest.
     SyncScene(Scene),
-    // TODO: RenderTileRequest
-    // TODO: RenderTileResponse
+    /// Tile render request packet type, used to request peer to render tile
+    /// packet.
+    RenderTileRequest((usize, usize), (usize, usize)),
+    /// Tile render response packet type, response oof the RenderTileRequest
+    /// packet type.
+    RenderTileResponse(Vec<u8>),
 }
 
 #[derive(Debug, Error)]
