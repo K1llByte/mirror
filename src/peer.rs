@@ -2,11 +2,10 @@ use std::fmt::Display;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
 use std::{collections::HashMap, io};
 
+use async_channel::Receiver;
 use core::future::Future;
-use glam::Vec3;
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio::sync::Mutex;
@@ -14,18 +13,19 @@ use tokio::task::{self};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::packet::{MirrorPacket, PacketError};
-use crate::scene::{Camera, Scene, Sphere};
+use crate::renderer::{Renderer, Tile};
 
 pub type PeerTable = Arc<Mutex<HashMap<SocketAddr, Peer>>>;
 
 #[derive(Debug)]
 pub struct Peer {
-    pub write_socket: OwnedWriteHalf,
     pub name: Option<String>,
+    pub write_socket: OwnedWriteHalf,
+    pub tile_recv_queue: Receiver<Tile>,
 }
 
 pub async fn listen_task(
-    peer_table: PeerTable,
+    renderer: Arc<Renderer>,
     host: impl ToSocketAddrs + Display,
     bootstrap_peers: Vec<SocketAddr>,
 ) -> io::Result<()> {
@@ -36,26 +36,20 @@ pub async fn listen_task(
 
     // Connect to bootstrap peers.
     info!("Connecting to bootstrap peers ...");
-    connect_to_peers(
-        bootstrap_peers,
-        peer_table.clone(),
-        listen_port,
-        "Bootstrap",
-    )
-    .await;
+    connect_to_peers(bootstrap_peers, renderer.clone(), listen_port, "Bootstrap").await;
 
     loop {
         // Handle incoming connections.
         let (socket, _) = listener.accept().await?;
 
         // Dispatch into a separate task.
-        tokio::spawn(peer_task(peer_table.clone(), socket, listen_port, "Listen"));
+        tokio::spawn(peer_task(renderer.clone(), socket, listen_port, "Listen"));
     }
 }
 
 pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
     peers: P,
-    peer_table: PeerTable,
+    renderer: Arc<Renderer>,
     listen_port: u16,
     tag: &'static str,
 ) {
@@ -73,7 +67,12 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
             continue;
         }
         // Refuse duplicate connections
-        if peer_table.lock().await.contains_key(&peer_listen_address) {
+        if renderer
+            .peer_table
+            .lock()
+            .await
+            .contains_key(&peer_listen_address)
+        {
             warn!(
                 "[{tag}, {:?}] - Trying to connect to duplicate peer '{peer_listen_address}'. Skipped.",
                 task::try_id()
@@ -90,57 +89,57 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
             continue;
         };
         // Dispatch into a separate task.
-        tokio::spawn(peer_task(peer_table.clone(), socket, listen_port, tag));
+        tokio::spawn(peer_task(renderer.clone(), socket, listen_port, tag));
     }
 }
 
-pub async fn peer_write_task(peer_table: PeerTable, peer_listen_address: SocketAddr) {
-    const SECS: u64 = 5;
-    for s in 0..SECS {
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        debug!("Sending scene in {}", SECS - s);
-    }
-    debug!("HELLO WORLD!");
+// pub async fn peer_write_task(peer_table: PeerTable, peer_listen_address: SocketAddr) {
+//     const SECS: u64 = 5;
+//     for s in 0..SECS {
+//         tokio::time::sleep(Duration::from_secs(1)).await;
+//         debug!("Sending scene in {}", SECS - s);
+//     }
+//     debug!("HELLO WORLD!");
 
-    let sphere_left = Sphere {
-        position: Vec3::new(-1.0, 0.0, -1.0),
-        radius: 0.5,
-    };
-    let sphere_center = Sphere {
-        position: Vec3::new(0.0, 0.0, -1.0),
-        radius: 0.5,
-    };
-    let sphere_right = Sphere {
-        position: Vec3::new(1.0, 0.0, -1.0),
-        radius: 0.5,
-    };
-    let sphere_ground = Sphere {
-        position: Vec3::new(0.0, -100.5, -1.0),
-        radius: 100.0,
-    };
+//     let sphere_left = Sphere {
+//         position: Vec3::new(-1.0, 0.0, -1.0),
+//         radius: 0.5,
+//     };
+//     let sphere_center = Sphere {
+//         position: Vec3::new(0.0, 0.0, -1.0),
+//         radius: 0.5,
+//     };
+//     let sphere_right = Sphere {
+//         position: Vec3::new(1.0, 0.0, -1.0),
+//         radius: 0.5,
+//     };
+//     let sphere_ground = Sphere {
+//         position: Vec3::new(0.0, -100.5, -1.0),
+//         radius: 100.0,
+//     };
 
-    // Scene
-    let scene = Scene {
-        camera: Camera {
-            position: Vec3::ZERO,
-            width: 400f32,
-            height: 300f32,
-        },
-        objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
-    };
+//     // Scene
+//     let scene = Scene {
+//         camera: Camera {
+//             position: Vec3::ZERO,
+//             width: 400f32,
+//             height: 300f32,
+//         },
+//         objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
+//     };
 
-    let mut peer_table_guard = peer_table.lock().await;
-    let Some(peer) = peer_table_guard.get_mut(&peer_listen_address) else {
-        return;
-    };
-    MirrorPacket::SyncScene(scene)
-        .write(&mut peer.write_socket)
-        .await
-        .expect("This is supposed to work since im just testing");
-}
+//     let mut peer_table_guard = peer_table.lock().await;
+//     let Some(peer) = peer_table_guard.get_mut(&peer_listen_address) else {
+//         return;
+//     };
+//     MirrorPacket::SyncScene(scene)
+//         .write(&mut peer.write_socket)
+//         .await
+//         .expect("This is supposed to work since im just testing");
+// }
 
 pub fn peer_task(
-    peer_table: PeerTable,
+    renderer: Arc<Renderer>,
     socket: TcpStream,
     listen_port: u16,
     tag: &'static str,
@@ -174,8 +173,9 @@ pub fn peer_task(
         };
         let peer_listen_address = SocketAddr::new(peer_address.ip(), peer_listen_port);
 
+        let (tile_send_queue, tile_recv_queue) = async_channel::unbounded();
         {
-            let mut peer_table_guard = peer_table.lock().await;
+            let mut peer_table_guard = renderer.peer_table.lock().await;
             // Refuse self connections
             if peer_listen_address == local_listen_address {
                 info!(
@@ -199,6 +199,7 @@ pub fn peer_task(
                 Peer {
                     name: peer_name,
                     write_socket,
+                    tile_recv_queue,
                 },
             );
             // Once its added to the peer table, its considered connected to the network.
@@ -227,9 +228,6 @@ pub fn peer_task(
                 .unwrap()
         }
 
-        // FIXME: Temporary
-        // tokio::spawn(peer_write_task(peer_table.clone(), peer_listen_address));
-
         // 5. Proceed with normal flow.
         'outer: loop {
             match MirrorPacket::read(&mut read_socket).await {
@@ -246,11 +244,12 @@ pub fn peer_task(
                         peer_listen_port,
                         new_peers
                     );
-                    connect_to_peers(new_peers, peer_table.clone(), listen_port, "Gossip").await;
+                    connect_to_peers(new_peers, renderer.clone(), listen_port, "Gossip").await;
                     debug!(
                         "[{tag}, {}] PeerTable connections: {:?}",
                         task::id(),
-                        peer_table
+                        renderer
+                            .peer_table
                             .lock()
                             .await
                             .iter()
@@ -260,6 +259,26 @@ pub fn peer_task(
                 }
                 Ok(MirrorPacket::SyncScene(scene)) => {
                     debug!("[{tag}, {}] Received scene: {:?}", task::id(), scene);
+                }
+                Ok(MirrorPacket::RenderTileResponse(tile)) => {
+                    debug!("[{tag}, {}] Received render tile response", task::id());
+                    if let Err(err) = tile_send_queue.send(tile).await {
+                        error!("{err}")
+                    }
+                }
+                Ok(MirrorPacket::RenderTileRequest(begin_pos, tile_size)) => {
+                    debug!("[{tag}, {}] Received render tile request", task::id());
+                    let mut peer_table_guard = renderer.peer_table.lock().await;
+                    let peer = peer_table_guard
+                        .get_mut(&peer_listen_address)
+                        .expect("Should be available while this tasks runs");
+                    let tile = renderer.render_tile(begin_pos, tile_size);
+                    if let Err(err) = MirrorPacket::RenderTileResponse(tile)
+                        .write(&mut peer.write_socket)
+                        .await
+                    {
+                        error!("[{tag}, {}] Error: {:?}", task::id(), err);
+                    }
                 }
                 Err(PacketError::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => {
                     debug!(
@@ -277,7 +296,11 @@ pub fn peer_task(
             }
         }
 
-        peer_table.lock().await.remove(&peer_listen_address);
+        renderer
+            .peer_table
+            .lock()
+            .await
+            .remove(&peer_listen_address);
         info!(
             "[{tag}, {}] - Disconnected from '{}'",
             task::id(),
@@ -287,7 +310,8 @@ pub fn peer_task(
         debug!(
             "[{tag}, {}] PeerTable connections: {:?}",
             task::id(),
-            peer_table
+            renderer
+                .peer_table
                 .lock()
                 .await
                 .iter()

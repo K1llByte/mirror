@@ -47,7 +47,7 @@ fn main() -> anyhow::Result<()> {
 
     // Initialize logger.
     tracing_subscriber::fmt()
-        .with_env_filter("mirror=trace")
+        .with_env_filter("mirror=info")
         .with_timer(CustomTime)
         .init();
 
@@ -66,8 +66,11 @@ fn main() -> anyhow::Result<()> {
     let peer_table = Arc::new(Mutex::new(HashMap::<SocketAddr, Peer>::new()));
     let renderer = Arc::new(Renderer::new(peer_table.clone()));
 
-    let listen_task_future =
-        runtime.spawn(listen_task(peer_table, config.host, config.bootstrap_peers));
+    let listen_task_future = runtime.spawn(listen_task(
+        renderer.clone(),
+        config.host,
+        config.bootstrap_peers,
+    ));
 
     if !args.no_gui {
         let options = eframe::NativeOptions::default();

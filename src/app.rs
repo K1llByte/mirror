@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use eframe::egui::{self, ColorImage, Key, RichText, TextureHandle, load::Bytes};
+use eframe::egui::{self, ColorImage, Key, TextureHandle, load::Bytes};
 use egui_extras::{Column, TableBuilder};
 use futures::FutureExt;
 use tokio::{runtime::Runtime, task::JoinHandle};
