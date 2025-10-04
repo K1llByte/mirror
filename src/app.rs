@@ -7,6 +7,7 @@ use tokio::{runtime::Runtime, sync::Mutex, task::JoinHandle};
 use crate::{
     image::Image,
     renderer::{self, Renderer},
+    scene::Scene,
 };
 
 pub struct MirrorApp {
@@ -14,6 +15,7 @@ pub struct MirrorApp {
     runtime: Runtime,
     renderer: Arc<Renderer>,
     render_image: Arc<Mutex<Image>>,
+    scene: Arc<Mutex<Scene>>,
 
     // Ui data
     enable_side_panel: bool,
@@ -22,12 +24,13 @@ pub struct MirrorApp {
 }
 
 impl MirrorApp {
-    pub fn new(runtime: Runtime, renderer: Arc<Renderer>) -> Self {
+    pub fn new(runtime: Runtime, renderer: Arc<Renderer>, scene: Arc<Mutex<Scene>>) -> Self {
         Self {
             // Backend data
             runtime,
             renderer,
             render_image: Arc::new(Mutex::new(Image::new((400, 300)))),
+            scene,
             // Ui data
             enable_side_panel: true,
             texture: None,

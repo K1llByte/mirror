@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use chrono::Local;
 use clap::Parser;
+use glam::Vec3;
 use tokio::sync::Mutex;
 use tracing::info;
 use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
@@ -11,6 +12,7 @@ use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 use crate::config::Config;
 use crate::peer::{Peer, listen_task};
 use crate::renderer::Renderer;
+use crate::scene::{Camera, Scene, Sphere};
 
 mod app;
 mod config;
@@ -65,6 +67,32 @@ fn main() -> anyhow::Result<()> {
 
     let peer_table = Arc::new(Mutex::new(HashMap::<SocketAddr, Peer>::new()));
     let renderer = Arc::new(Renderer::new(peer_table.clone()));
+    let scene = {
+        let sphere_left = Sphere {
+            position: Vec3::new(-1.0, 0.0, -1.0),
+            radius: 0.5,
+        };
+        let sphere_center = Sphere {
+            position: Vec3::new(0.0, 0.0, -1.0),
+            radius: 0.5,
+        };
+        let sphere_right = Sphere {
+            position: Vec3::new(1.0, 0.0, -1.0),
+            radius: 0.5,
+        };
+        let sphere_ground = Sphere {
+            position: Vec3::new(0.0, -100.5, -1.0),
+            radius: 100.0,
+        };
+        Arc::new(Mutex::new(Scene {
+            camera: Camera {
+                position: Vec3::ZERO,
+                width: 400f32,
+                height: 300f32,
+            },
+            objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
+        }))
+    };
 
     let listen_task_future = runtime.spawn(listen_task(
         renderer.clone(),
@@ -77,7 +105,13 @@ fn main() -> anyhow::Result<()> {
         eframe::run_native(
             "Mirror App",
             options,
-            Box::new(|_cc| Ok(Box::new(app::MirrorApp::new(runtime, renderer.clone())))),
+            Box::new(|_cc| {
+                Ok(Box::new(app::MirrorApp::new(
+                    runtime,
+                    renderer.clone(),
+                    scene,
+                )))
+            }),
         )
         .unwrap();
     } else {
