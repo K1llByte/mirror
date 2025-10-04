@@ -1,64 +1,38 @@
-use std::{net::SocketAddr, num::NonZero, sync::Arc, thread, time::Instant};
+use std::{cmp::min, net::SocketAddr, num::NonZero, sync::Arc, thread, time::Instant};
 
 use async_channel::Receiver;
 use futures::future;
+use glam::Vec3;
 use rand::Rng;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
-use crate::{packet::MirrorPacket, peer::PeerTable, render_image::RenderImage};
-
-pub type Tile = Vec<u8>;
+use crate::{
+    image::{Image, Tile},
+    packet::MirrorPacket,
+    peer::PeerTable,
+};
 
 pub struct Renderer {
     pub peer_table: PeerTable,
-    pub render_image: RenderImage,
 }
 
 impl Renderer {
     pub fn new(pt: PeerTable) -> Self {
-        Self {
-            peer_table: pt,
-            render_image: RenderImage::new((400, 300)),
-        }
+        Self { peer_table: pt }
     }
 
     pub fn render_tile(&self, _begin: (usize, usize), size: (usize, usize)) -> Tile {
-        let mut res = Vec::with_capacity(size.0 * size.1 * 3);
+        // let mut res = Vec::with_capacity(size.0 * size.1 * 3);
+        let mut tile = Image::new(size);
         let mut rng = rand::rng();
-        let random_rbg: [u8; _] = [rng.random(), rng.random(), rng.random()];
-        for _ in 0..size.1 {
-            for _ in 0..size.0 {
-                res.push(random_rbg[0]);
-                res.push(random_rbg[1]);
-                res.push(random_rbg[2]);
+        let random_rbg: [f32; _] = [rng.random(), rng.random(), rng.random()];
+        for y in 0..size.1 {
+            for x in 0..size.0 {
+                tile.set(x, y, Vec3::new(random_rbg[0], random_rbg[1], random_rbg[2]));
             }
         }
-
-        res
-    }
-}
-
-async fn image_insert_tile(
-    image: &Arc<Mutex<Vec<u8>>>,
-    image_size: (usize, usize),
-    tile: &Tile,
-    begin_pos: (usize, usize),
-    tile_size: (usize, usize),
-) {
-    let image = &mut image.lock().await;
-    const NUM_CHANNELS: usize = 3;
-    for ty in 0..tile_size.1 {
-        for tx in 0..tile_size.0 {
-            let x = begin_pos.0 + tx;
-            let y = begin_pos.1 + ty;
-            image[0 + NUM_CHANNELS * x + NUM_CHANNELS * image_size.0 * y] =
-                tile[0 + NUM_CHANNELS * tx + NUM_CHANNELS * tile_size.0 * ty];
-            image[1 + NUM_CHANNELS * x + NUM_CHANNELS * image_size.0 * y] =
-                tile[1 + NUM_CHANNELS * tx + NUM_CHANNELS * tile_size.0 * ty];
-            image[2 + NUM_CHANNELS * x + NUM_CHANNELS * image_size.0 * y] =
-                tile[2 + NUM_CHANNELS * tx + NUM_CHANNELS * tile_size.0 * ty];
-        }
+        tile
     }
 }
 
@@ -70,24 +44,18 @@ struct TileRenderWork {
 async fn local_render_tile_task(
     work_recv_queue: Receiver<TileRenderWork>,
     renderer: Arc<Renderer>,
-    render_image: Arc<Mutex<Vec<u8>>>,
+    render_image: Arc<Mutex<Image>>,
 ) {
-    const IMAGE_SIZE: (usize, usize) = (400, 300);
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
             let tile = renderer.render_tile(tile_render_work.begin_pos, tile_render_work.tile_size);
-
             // Insert result tile in render_image
-            image_insert_tile(
-                &render_image,
-                IMAGE_SIZE,
-                &tile,
-                tile_render_work.begin_pos,
-                tile_render_work.tile_size,
-            )
-            .await;
+            render_image
+                .lock()
+                .await
+                .insert_tile(&tile, tile_render_work.begin_pos);
         } else {
             break;
         }
@@ -97,13 +65,11 @@ async fn local_render_tile_task(
 async fn remote_render_tile_task(
     work_recv_queue: Receiver<TileRenderWork>,
     renderer: Arc<Renderer>,
-    render_image: Arc<Mutex<Vec<u8>>>,
+    render_image: Arc<Mutex<Image>>,
     peer_listen_address: SocketAddr,
 ) {
-    const IMAGE_SIZE: (usize, usize) = (400, 300);
     loop {
         // Receive work
-        debug!("Before receiving TileRenderWork");
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
             let tile = {
@@ -112,7 +78,6 @@ async fn remote_render_tile_task(
                     .get_mut(&peer_listen_address)
                     .expect("Peer data should exist");
                 // Send render request
-                debug!("Sending render tile request");
                 if let Err(_) = MirrorPacket::RenderTileRequest(
                     tile_render_work.begin_pos,
                     tile_render_work.tile_size,
@@ -125,7 +90,6 @@ async fn remote_render_tile_task(
                 }
 
                 // Wait for response tile
-                debug!("Before receiving Tile from peer");
                 match peer.tile_recv_queue.recv().await {
                     Ok(tile) => tile,
                     Err(_) => {
@@ -136,31 +100,23 @@ async fn remote_render_tile_task(
             };
 
             // Insert result tile in render_image
-            image_insert_tile(
-                &render_image,
-                IMAGE_SIZE,
-                &tile,
-                tile_render_work.begin_pos,
-                tile_render_work.tile_size,
-            )
-            .await;
+            render_image
+                .lock()
+                .await
+                .insert_tile(&tile, tile_render_work.begin_pos);
         } else {
             break;
         }
     }
 }
 
-pub async fn render_task(renderer: Arc<Renderer>) -> Vec<u8> {
+pub async fn render_task(renderer: Arc<Renderer>, render_image: Arc<Mutex<Image>>) {
     // Measure execution time from here
     let render_time = Instant::now();
 
-    const IMAGE_SIZE: (usize, usize) = (400, 300);
-    const RENDER_TILE_MAX_SIZE: (usize, usize) = (50, 150 / 2);
-    assert!(IMAGE_SIZE.0 >= RENDER_TILE_MAX_SIZE.0 && IMAGE_SIZE.1 >= RENDER_TILE_MAX_SIZE.1);
-
-    let render_image: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::from(
-        [0u8; IMAGE_SIZE.0 * IMAGE_SIZE.1 * 3],
-    )));
+    const RENDER_TILE_MAX_SIZE: (usize, usize) = (83, 20);
+    let image_size = render_image.lock().await.size();
+    assert!(image_size.0 >= RENDER_TILE_MAX_SIZE.0 && image_size.1 >= RENDER_TILE_MAX_SIZE.1);
 
     let (work_send_queue, work_recv_queue) = async_channel::unbounded::<TileRenderWork>();
 
@@ -171,7 +127,8 @@ pub async fn render_task(renderer: Arc<Renderer>) -> Vec<u8> {
 
     let mut join_handles = Vec::with_capacity(num_local_tasks + num_remote_tasks);
 
-    // Spawn local worker tasks
+    // Dispatch work tasks:
+    // - Local render_tile tasks: As many as CPU cores.
     for _ in 0..num_local_tasks {
         join_handles.push(tokio::spawn(local_render_tile_task(
             work_recv_queue.clone(),
@@ -179,8 +136,7 @@ pub async fn render_task(renderer: Arc<Renderer>) -> Vec<u8> {
             render_image.clone(),
         )));
     }
-
-    // Spawn remote worker tasks
+    // - Remote render_tile tasks: As many as connected peers.
     for peer_listen_address in renderer.peer_table.lock().await.keys().cloned() {
         join_handles.push(tokio::spawn(remote_render_tile_task(
             work_recv_queue.clone(),
@@ -190,40 +146,29 @@ pub async fn render_task(renderer: Arc<Renderer>) -> Vec<u8> {
         )));
     }
 
-    // Dispatch initial tasks:
-    // - Local render_tile tasks: As many as CPU cores.
-    // - Remote render_tile tasks: As many as connected peers.
-    let mut begin_height: usize = 0;
-    while begin_height < IMAGE_SIZE.1 {
-        // FIXME: Im pretty sure this is doable with better maths, but Im lazy now
-        let tile_height = if (begin_height + RENDER_TILE_MAX_SIZE.1) <= IMAGE_SIZE.1 {
-            RENDER_TILE_MAX_SIZE.1
-        } else {
-            IMAGE_SIZE.1 % RENDER_TILE_MAX_SIZE.1
-        };
-        let mut begin_width: usize = 0;
-        while begin_width < IMAGE_SIZE.0 {
-            // FIXME: Im pretty sure this is doable with better maths, but Im lazy now
-            let tile_width = if (begin_width + RENDER_TILE_MAX_SIZE.0) <= IMAGE_SIZE.0 {
-                RENDER_TILE_MAX_SIZE.0
-            } else {
-                IMAGE_SIZE.0 % RENDER_TILE_MAX_SIZE.0
-            };
+    // Loop over all tiles splitted to be rendered. This loop takes into
+    // account the last remainder tiles that could not be of size
+    // RENDER_TILE_MAX_SIZE.
+    let num_width_tiles = image_size.0 / RENDER_TILE_MAX_SIZE.0
+        + (image_size.0 % RENDER_TILE_MAX_SIZE.0 != 0) as usize;
+    let num_height_tiles = image_size.1 / RENDER_TILE_MAX_SIZE.1
+        + (image_size.1 % RENDER_TILE_MAX_SIZE.1 != 0) as usize;
+    for ty in 0..num_height_tiles {
+        let begin_height = ty * RENDER_TILE_MAX_SIZE.1;
+        let tile_height = min(RENDER_TILE_MAX_SIZE.1, image_size.1 - begin_height);
+        for tx in 0..num_width_tiles {
+            let begin_width = tx * RENDER_TILE_MAX_SIZE.0;
+            let tile_width = min(RENDER_TILE_MAX_SIZE.0, image_size.0 - begin_width);
 
-            let begin_pos = (begin_width, begin_height);
-            let tile_size = (tile_width, tile_height);
-
+            // Send work to queue
             work_send_queue
                 .send(TileRenderWork {
-                    begin_pos,
-                    tile_size,
+                    begin_pos: (begin_width, begin_height),
+                    tile_size: (tile_width, tile_height),
                 })
                 .await
                 .unwrap();
-
-            begin_width += RENDER_TILE_MAX_SIZE.0;
         }
-        begin_height += RENDER_TILE_MAX_SIZE.1;
     }
 
     // Close channel so that tasks can finish and join
@@ -234,7 +179,4 @@ pub async fn render_task(renderer: Arc<Renderer>) -> Vec<u8> {
 
     // Log render time
     info!("Render time: {} ms", render_time.elapsed().as_millis());
-
-    let mut image = render_image.lock().await;
-    std::mem::take(&mut *image)
 }

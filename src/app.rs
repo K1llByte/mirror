@@ -2,20 +2,23 @@ use std::{sync::Arc, time::Duration};
 
 use eframe::egui::{self, ColorImage, Key, TextureHandle, load::Bytes};
 use egui_extras::{Column, TableBuilder};
-use futures::FutureExt;
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::{runtime::Runtime, sync::Mutex, task::JoinHandle};
 
-use crate::renderer::{self, Renderer};
+use crate::{
+    image::Image,
+    renderer::{self, Renderer},
+};
 
 pub struct MirrorApp {
     // Backend data
     runtime: Runtime,
     renderer: Arc<Renderer>,
+    render_image: Arc<Mutex<Image>>,
 
     // Ui data
     enable_side_panel: bool,
     texture: Option<egui::TextureHandle>,
-    render_future: Option<JoinHandle<Vec<u8>>>,
+    render_join_handle: Option<JoinHandle<()>>,
 }
 
 impl MirrorApp {
@@ -24,42 +27,37 @@ impl MirrorApp {
             // Backend data
             runtime,
             renderer,
+            render_image: Arc::new(Mutex::new(Image::new((400, 300)))),
             // Ui data
             enable_side_panel: true,
             texture: None,
-            render_future: None,
+            render_join_handle: None,
         }
     }
 
     fn show_render_image(&mut self, ui: &mut egui::Ui) {
-        const IMAGE_SIZE: [usize; 2] = [400, 300];
+        let image_size: [usize; 2] = self.render_image.blocking_lock().size().into();
 
         let texture: &TextureHandle = if self
-            .render_future
+            .render_join_handle
             .as_ref()
             .is_some_and(|fut| fut.is_finished())
         {
-            let image_bytes = Bytes::Shared(Arc::from(
-                self.render_future
-                    .as_mut()
-                    .unwrap()
-                    .now_or_never()
-                    .unwrap()
-                    .unwrap(),
-            ));
-            let image_data = ColorImage::from_rgb(IMAGE_SIZE, image_bytes.as_ref());
+            let image_bytes =
+                Bytes::Shared(Arc::from(self.render_image.blocking_lock().to_bytes()));
+            let image_data = ColorImage::from_rgb(image_size, image_bytes.as_ref());
             self.texture.replace(ui.ctx().load_texture(
                 "render_image",
                 image_data,
                 Default::default(),
             ));
-            self.render_future = None;
+            self.render_join_handle = None;
             self.texture.as_ref().unwrap()
         } else {
             // Create all white image
             self.texture.get_or_insert_with(|| {
                 let image_bytes = Bytes::Shared(Arc::new([255u8; 400 * 300 * 3]));
-                let image_data = ColorImage::from_rgb(IMAGE_SIZE, image_bytes.as_ref());
+                let image_data = ColorImage::from_rgb(image_size, image_bytes.as_ref());
 
                 ui.ctx()
                     .load_texture("render_image", image_data, Default::default())
@@ -85,8 +83,8 @@ impl eframe::App for MirrorApp {
                 ui.heading("Mirror");
                 ui.separator();
 
-                if let Ok(peer_table) = self.renderer.peer_table.try_lock() {
-                    if peer_table.keys().len() == 0 {
+                if let Ok(peer_table_guard) = self.renderer.peer_table.try_lock() {
+                    if peer_table_guard.keys().len() == 0 {
                         ui.label("No connected peers.");
                     } else {
                         TableBuilder::new(ui)
@@ -95,10 +93,19 @@ impl eframe::App for MirrorApp {
                             .cell_layout(egui::Layout::left_to_right(egui::Align::Min))
                             .columns(Column::remainder(), 2)
                             .body(|mut body| {
-                                for (i, address) in peer_table.keys().enumerate() {
+                                for (i, address) in peer_table_guard.keys().enumerate() {
                                     body.row(20.0, |mut row| {
                                         row.col(|ui| {
-                                            ui.label(format!("peer{i}"));
+                                            ui.label(format!(
+                                                "{}: {}",
+                                                i + 1,
+                                                peer_table_guard
+                                                    .get(&address)
+                                                    .unwrap()
+                                                    .name
+                                                    .clone()
+                                                    .unwrap_or("<unnamed>".into())
+                                            ));
                                         });
                                         row.col(|ui| {
                                             ui.label(address.to_string());
@@ -116,10 +123,10 @@ impl eframe::App for MirrorApp {
                 let render_button =
                     ui.add_sized([ui.available_width(), 0.0], egui::Button::new("Render"));
                 if render_button.clicked() {
-                    self.render_future = Some(
-                        self.runtime
-                            .spawn(renderer::render_task(self.renderer.clone())),
-                    );
+                    self.render_join_handle = Some(self.runtime.spawn(renderer::render_task(
+                        self.renderer.clone(),
+                        self.render_image.clone(),
+                    )));
                 }
             });
         }

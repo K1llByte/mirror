@@ -12,8 +12,9 @@ use tokio::sync::Mutex;
 use tokio::task::{self};
 use tracing::{debug, error, info, trace, warn};
 
+use crate::image::Tile;
 use crate::packet::{MirrorPacket, PacketError};
-use crate::renderer::{Renderer, Tile};
+use crate::renderer::Renderer;
 
 pub type PeerTable = Arc<Mutex<HashMap<SocketAddr, Peer>>>;
 
@@ -24,6 +25,8 @@ pub struct Peer {
     pub tile_recv_queue: Receiver<Tile>,
 }
 
+/// Listen task, responsible for connecting to bootstrap peers and handling new
+/// incomming connections and spawning new peer tasks.
 pub async fn listen_task(
     renderer: Arc<Renderer>,
     host: impl ToSocketAddrs + Display,
@@ -41,7 +44,6 @@ pub async fn listen_task(
     loop {
         // Handle incoming connections.
         let (socket, _) = listener.accept().await?;
-
         // Dispatch into a separate task.
         tokio::spawn(peer_task(renderer.clone(), socket, listen_port, "Listen"));
     }
@@ -55,7 +57,7 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
 ) {
     for peer_listen_address in peers {
         let peer_listen_address = peer_listen_address.into();
-        // TODO: Hardcoded 127.0.0.1 for now, will
+        // FIXME: Hardcoded 127.0.0.1 for now, will
         let local_listen_address =
             SocketAddr::from_str(format!("127.0.0.1:{listen_port}").as_str()).unwrap();
         // Avoid trying to connect this my peer to itself
@@ -260,12 +262,7 @@ pub fn peer_task(
                 Ok(MirrorPacket::SyncScene(scene)) => {
                     debug!("[{tag}, {}] Received scene: {:?}", task::id(), scene);
                 }
-                Ok(MirrorPacket::RenderTileResponse(tile)) => {
-                    debug!("[{tag}, {}] Received render tile response", task::id());
-                    if let Err(err) = tile_send_queue.send(tile).await {
-                        error!("{err}")
-                    }
-                }
+
                 Ok(MirrorPacket::RenderTileRequest(begin_pos, tile_size)) => {
                     debug!("[{tag}, {}] Received render tile request", task::id());
                     let mut peer_table_guard = renderer.peer_table.lock().await;
@@ -280,6 +277,12 @@ pub fn peer_task(
                         error!("[{tag}, {}] Error: {:?}", task::id(), err);
                     }
                 }
+                Ok(MirrorPacket::RenderTileResponse(tile)) => {
+                    debug!("[{tag}, {}] Received render tile response", task::id());
+                    if let Err(err) = tile_send_queue.send(tile).await {
+                        error!("{err}")
+                    }
+                }
                 Err(PacketError::Io(error)) if error.kind() == io::ErrorKind::UnexpectedEof => {
                     debug!(
                         "[{tag}, {}] - Going to disconnect from '{}'",
@@ -292,7 +295,6 @@ pub fn peer_task(
                     error!("[{tag}, {}] - IoError: {error}", task::id());
                     break 'outer;
                 }
-                _ => {}
             }
         }
 

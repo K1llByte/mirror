@@ -14,9 +14,9 @@ use crate::renderer::Renderer;
 
 mod app;
 mod config;
+mod image;
 mod packet;
 mod peer;
-mod render_image;
 mod renderer;
 mod scene;
 
@@ -47,7 +47,7 @@ fn main() -> anyhow::Result<()> {
 
     // Initialize logger.
     tracing_subscriber::fmt()
-        .with_env_filter("mirror=info")
+        .with_env_filter("mirror=debug")
         .with_timer(CustomTime)
         .init();
 
