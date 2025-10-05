@@ -10,7 +10,7 @@ use std::{
 use async_channel::Receiver;
 use futures::future;
 use glam::Vec3;
-use rand::Rng;
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
@@ -18,7 +18,9 @@ use crate::{
     image::{Image, Tile},
     packet::MirrorPacket,
     peer::PeerTable,
-    scene::Scene,
+    ray::Ray,
+    scene::{Hittable, Scene},
+    utis::random_vector,
 };
 
 pub struct Renderer {
@@ -31,9 +33,30 @@ impl Renderer {
     pub fn new(pt: PeerTable) -> Self {
         Self {
             peer_table: pt,
-            samples_per_pixel: 1,
+            samples_per_pixel: 4,
             max_bounces: 10,
         }
+    }
+
+    pub fn trace(&self, scene: &Scene, ray: &Ray, depth: usize) -> Vec3 {
+        // Depth is the maximum number of recursive ray bounces possible
+        if depth == 0 {
+            return Vec3::new(0.0, 0.0, 0.0);
+        }
+
+        if let Some(hit) = scene.hit(&ray) {
+            let direction = hit.normal + random_vector(&mut rand::rng());
+            return Vec3::new(0.2, 0.4, 0.6)
+                * self.trace(scene, &Ray::new(hit.position, direction), depth - 1);
+
+            // if let Some(scattered) = hit.material.scatter(ray, &hit) {
+            //     return scattered.attenuation * self.trace(scene, &scattered.ray, depth - 1);
+            // }
+            // return Vec3::new(0.2, 0.2, 0.2);
+        }
+
+        let a = 0.5 * (ray.direction().normalize().y + 1.0);
+        (1.0 - a) * Vec3::new(1.0, 1.0, 1.0) + a * Vec3::new(0.5, 0.7, 1.0)
     }
 
     pub fn render_tile(
@@ -44,14 +67,9 @@ impl Renderer {
         image_size: (usize, usize),
     ) -> Tile {
         let mut tile = Tile::new(tile_size);
-        let mut rng = rand::rng();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
 
-        let random_rbg: [f32; _] = [rng.random(), rng.random(), rng.random()];
-        // for y in 0..tile_size.1 {
-        //     for x in 0..tile_size.0 {
-        //         tile.set(x, y, Vec3::new(random_rbg[0], random_rbg[1], random_rbg[2]));
-        //     }
-        // }
+        // let random_rbg: [f32; _] = [rng.random(), rng.random(), rng.random()];
 
         let sample_weight = 1.0 / (self.samples_per_pixel as f32);
         for v in 0..tile_size.1 {
@@ -64,8 +82,8 @@ impl Renderer {
 
                     // Trace pixel color
                     let ray = scene.camera.create_viewport_ray(sample_u, sample_v);
-                    // let sample_color = self.trace(&scene, &ray, self.max_bounces);
-                    let sample_color = Vec3::new(random_rbg[0], random_rbg[1], random_rbg[2]);
+                    let sample_color = self.trace(&scene, &ray, self.max_bounces);
+                    // let sample_color = Vec3::new(random_rbg[0], random_rbg[1], random_rbg[2]);
 
                     pixel_color += sample_color * sample_weight;
                 }

@@ -24,6 +24,7 @@ mod peer;
 mod ray;
 mod renderer;
 mod scene;
+mod utis;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -88,7 +89,7 @@ fn main() -> anyhow::Result<()> {
             radius: 100.0,
         };
         Arc::new(Scene {
-            camera: Camera::new(Vec3::ZERO, 1920f32, 1080f32),
+            camera: Camera::new(Vec3::ZERO, 1280f32, 720f32),
             objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
         })
     };
