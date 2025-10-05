@@ -1,8 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
-use eframe::egui::{self, ColorImage, Key, TextureHandle, load::Bytes};
+use eframe::egui::{self, ColorImage, Key, TextureHandle, Ui, load::Bytes};
 use egui_extras::{Column, TableBuilder};
 use tokio::{runtime::Runtime, sync::Mutex, task::JoinHandle};
+use tracing::debug;
 
 use crate::{
     image::Image,
@@ -29,7 +30,7 @@ impl MirrorApp {
             // Backend data
             runtime,
             renderer,
-            render_image: Arc::new(Mutex::new(Image::new((400, 300)))),
+            render_image: Arc::new(Mutex::new(Image::new((1920, 1080)))),
             scene,
             // Ui data
             enable_side_panel: true,
@@ -59,7 +60,8 @@ impl MirrorApp {
         } else {
             // Create all white image
             self.texture.get_or_insert_with(|| {
-                let image_bytes = Bytes::Shared(Arc::new([255u8; 400 * 300 * 3]));
+                let image_bytes =
+                    Bytes::Shared(Arc::from(vec![255u8; image_size[0] * image_size[1] * 3]));
                 let image_data = ColorImage::from_rgb(image_size, image_bytes.as_ref());
 
                 ui.ctx()
@@ -123,8 +125,21 @@ impl eframe::App for MirrorApp {
 
                 ui.separator();
 
-                let render_button =
-                    ui.add_sized([ui.available_width(), 0.0], egui::Button::new("Render"));
+                let is_rendering = self
+                    .render_join_handle
+                    .as_ref()
+                    .is_some_and(|fut| !fut.is_finished());
+
+                let render_button = ui.add_enabled(!is_rendering, |ui: &mut Ui| {
+                    ui.add_sized(
+                        [ui.available_width(), 0.0],
+                        egui::Button::new(if is_rendering {
+                            "Rendering ..."
+                        } else {
+                            "Render"
+                        }),
+                    )
+                });
                 if render_button.clicked() {
                     self.render_join_handle = Some(self.runtime.spawn(renderer::render_task(
                         self.renderer.clone(),

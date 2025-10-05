@@ -95,51 +95,6 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
     }
 }
 
-// pub async fn peer_write_task(peer_table: PeerTable, peer_listen_address: SocketAddr) {
-//     const SECS: u64 = 5;
-//     for s in 0..SECS {
-//         tokio::time::sleep(Duration::from_secs(1)).await;
-//         debug!("Sending scene in {}", SECS - s);
-//     }
-//     debug!("HELLO WORLD!");
-
-//     let sphere_left = Sphere {
-//         position: Vec3::new(-1.0, 0.0, -1.0),
-//         radius: 0.5,
-//     };
-//     let sphere_center = Sphere {
-//         position: Vec3::new(0.0, 0.0, -1.0),
-//         radius: 0.5,
-//     };
-//     let sphere_right = Sphere {
-//         position: Vec3::new(1.0, 0.0, -1.0),
-//         radius: 0.5,
-//     };
-//     let sphere_ground = Sphere {
-//         position: Vec3::new(0.0, -100.5, -1.0),
-//         radius: 100.0,
-//     };
-
-//     // Scene
-//     let scene = Scene {
-//         camera: Camera {
-//             position: Vec3::ZERO,
-//             width: 400f32,
-//             height: 300f32,
-//         },
-//         objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
-//     };
-
-//     let mut peer_table_guard = peer_table.lock().await;
-//     let Some(peer) = peer_table_guard.get_mut(&peer_listen_address) else {
-//         return;
-//     };
-//     MirrorPacket::SyncScene(scene)
-//         .write(&mut peer.write_socket)
-//         .await
-//         .expect("This is supposed to work since im just testing");
-// }
-
 pub fn peer_task(
     renderer: Arc<Renderer>,
     socket: TcpStream,

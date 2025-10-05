@@ -87,8 +87,8 @@ fn main() -> anyhow::Result<()> {
         Arc::new(Mutex::new(Scene {
             camera: Camera {
                 position: Vec3::ZERO,
-                width: 400f32,
-                height: 300f32,
+                width: 1920f32,
+                height: 1080f32,
             },
             objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
         }))

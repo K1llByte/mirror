@@ -1,4 +1,11 @@
-use std::{cmp::min, net::SocketAddr, num::NonZero, sync::Arc, thread, time::Instant};
+use std::{
+    cmp::min,
+    net::SocketAddr,
+    num::NonZero,
+    sync::Arc,
+    thread::{self, sleep},
+    time::{Duration, Instant},
+};
 
 use async_channel::Receiver;
 use futures::future;
@@ -114,7 +121,7 @@ pub async fn render_task(renderer: Arc<Renderer>, render_image: Arc<Mutex<Image>
     // Measure execution time from here
     let render_time = Instant::now();
 
-    const RENDER_TILE_MAX_SIZE: (usize, usize) = (83, 20);
+    const RENDER_TILE_MAX_SIZE: (usize, usize) = (64, 64);
     let image_size = render_image.lock().await.size();
     assert!(image_size.0 >= RENDER_TILE_MAX_SIZE.0 && image_size.1 >= RENDER_TILE_MAX_SIZE.1);
 
