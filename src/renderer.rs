@@ -18,27 +18,62 @@ use crate::{
     image::{Image, Tile},
     packet::MirrorPacket,
     peer::PeerTable,
+    scene::Scene,
 };
 
 pub struct Renderer {
     pub peer_table: PeerTable,
+    samples_per_pixel: usize,
+    max_bounces: usize,
 }
 
 impl Renderer {
     pub fn new(pt: PeerTable) -> Self {
-        Self { peer_table: pt }
+        Self {
+            peer_table: pt,
+            samples_per_pixel: 1,
+            max_bounces: 10,
+        }
     }
 
-    pub fn render_tile(&self, _begin: (usize, usize), size: (usize, usize)) -> Tile {
-        // let mut res = Vec::with_capacity(size.0 * size.1 * 3);
-        let mut tile = Image::new(size);
+    pub fn render_tile(
+        &self,
+        scene: &Scene,
+        begin_pos: (usize, usize),
+        tile_size: (usize, usize),
+        image_size: (usize, usize),
+    ) -> Tile {
+        let mut tile = Tile::new(tile_size);
         let mut rng = rand::rng();
+
         let random_rbg: [f32; _] = [rng.random(), rng.random(), rng.random()];
-        for y in 0..size.1 {
-            for x in 0..size.0 {
-                tile.set(x, y, Vec3::new(random_rbg[0], random_rbg[1], random_rbg[2]));
+        // for y in 0..tile_size.1 {
+        //     for x in 0..tile_size.0 {
+        //         tile.set(x, y, Vec3::new(random_rbg[0], random_rbg[1], random_rbg[2]));
+        //     }
+        // }
+
+        let sample_weight = 1.0 / (self.samples_per_pixel as f32);
+        for v in 0..tile_size.1 {
+            for u in 0..tile_size.0 {
+                let mut pixel_color = Vec3::ZERO;
+                // Ray trace for each sample
+                for _ in 0..self.samples_per_pixel {
+                    let sample_u = (u + begin_pos.0) as f32 + rng.random_range(0.0..1.0);
+                    let sample_v = (v + begin_pos.1) as f32 + rng.random_range(0.0..1.0);
+
+                    // Trace pixel color
+                    let ray = scene.camera.create_viewport_ray(sample_u, sample_v);
+                    // let sample_color = self.trace(&scene, &ray, self.max_bounces);
+                    let sample_color = Vec3::new(random_rbg[0], random_rbg[1], random_rbg[2]);
+
+                    pixel_color += sample_color * sample_weight;
+                }
+                // Ray trace for this pixel
+                tile.set(u, v, pixel_color);
             }
         }
+
         tile
     }
 }
@@ -52,12 +87,19 @@ async fn local_render_tile_task(
     work_recv_queue: Receiver<TileRenderWork>,
     renderer: Arc<Renderer>,
     render_image: Arc<Mutex<Image>>,
+    scene: Arc<Scene>,
 ) {
+    let image_size = render_image.lock().await.size();
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
-            let tile = renderer.render_tile(tile_render_work.begin_pos, tile_render_work.tile_size);
+            let tile = renderer.render_tile(
+                &scene,
+                tile_render_work.begin_pos,
+                tile_render_work.tile_size,
+                image_size,
+            );
             // Insert result tile in render_image
             render_image
                 .lock()
@@ -73,8 +115,27 @@ async fn remote_render_tile_task(
     work_recv_queue: Receiver<TileRenderWork>,
     renderer: Arc<Renderer>,
     render_image: Arc<Mutex<Image>>,
+    scene: Arc<Scene>,
     peer_listen_address: SocketAddr,
 ) {
+    let image_size = render_image.lock().await.size();
+
+    // Synchronize scene before requesting to render tiles
+    {
+        let mut peer_table_guard = renderer.peer_table.lock().await;
+        let peer = peer_table_guard
+            .get_mut(&peer_listen_address)
+            .expect("Peer data should exist");
+        // FIXME: We shouldn't need to clone when we want to send the scene.
+        if let Err(_) = (MirrorPacket::SyncScene((*scene).clone()))
+            .write(&mut peer.write_socket)
+            .await
+        {
+            error!("Remote work task failed to send render tile work");
+            todo!("Fault tolerance: if fails to send, do something.");
+        }
+    }
+
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
@@ -85,10 +146,11 @@ async fn remote_render_tile_task(
                     .get_mut(&peer_listen_address)
                     .expect("Peer data should exist");
                 // Send render request
-                if let Err(_) = MirrorPacket::RenderTileRequest(
-                    tile_render_work.begin_pos,
-                    tile_render_work.tile_size,
-                )
+                if let Err(_) = (MirrorPacket::RenderTileRequest {
+                    begin_pos: tile_render_work.begin_pos,
+                    tile_size: tile_render_work.tile_size,
+                    image_size,
+                })
                 .write(&mut peer.write_socket)
                 .await
                 {
@@ -96,7 +158,7 @@ async fn remote_render_tile_task(
                     todo!("Fault tolerance: if fails to send, do something.");
                 }
 
-                // Wait for response tile
+                // Receive render response
                 match peer.tile_recv_queue.recv().await {
                     Ok(tile) => tile,
                     Err(_) => {
@@ -117,7 +179,11 @@ async fn remote_render_tile_task(
     }
 }
 
-pub async fn render_task(renderer: Arc<Renderer>, render_image: Arc<Mutex<Image>>) {
+pub async fn render_task(
+    renderer: Arc<Renderer>,
+    render_image: Arc<Mutex<Image>>,
+    scene: Arc<Scene>,
+) {
     // Measure execution time from here
     let render_time = Instant::now();
 
@@ -141,6 +207,7 @@ pub async fn render_task(renderer: Arc<Renderer>, render_image: Arc<Mutex<Image>
             work_recv_queue.clone(),
             renderer.clone(),
             render_image.clone(),
+            scene.clone(),
         )));
     }
     // - Remote render_tile tasks: As many as connected peers.
@@ -149,6 +216,7 @@ pub async fn render_task(renderer: Arc<Renderer>, render_image: Arc<Mutex<Image>
             work_recv_queue.clone(),
             renderer.clone(),
             render_image.clone(),
+            scene.clone(),
             peer_listen_address,
         )));
     }

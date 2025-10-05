@@ -16,7 +16,7 @@ pub struct MirrorApp {
     runtime: Runtime,
     renderer: Arc<Renderer>,
     render_image: Arc<Mutex<Image>>,
-    scene: Arc<Mutex<Scene>>,
+    scene: Arc<Scene>,
 
     // Ui data
     enable_side_panel: bool,
@@ -25,7 +25,7 @@ pub struct MirrorApp {
 }
 
 impl MirrorApp {
-    pub fn new(runtime: Runtime, renderer: Arc<Renderer>, scene: Arc<Mutex<Scene>>) -> Self {
+    pub fn new(runtime: Runtime, renderer: Arc<Renderer>, scene: Arc<Scene>) -> Self {
         Self {
             // Backend data
             runtime,
@@ -58,10 +58,9 @@ impl MirrorApp {
             self.render_join_handle = None;
             self.texture.as_ref().unwrap()
         } else {
-            // Create all white image
             self.texture.get_or_insert_with(|| {
                 let image_bytes =
-                    Bytes::Shared(Arc::from(vec![255u8; image_size[0] * image_size[1] * 3]));
+                    Bytes::Shared(Arc::from(vec![20u8; image_size[0] * image_size[1] * 3]));
                 let image_data = ColorImage::from_rgb(image_size, image_bytes.as_ref());
 
                 ui.ctx()
@@ -144,6 +143,7 @@ impl eframe::App for MirrorApp {
                     self.render_join_handle = Some(self.runtime.spawn(renderer::render_task(
                         self.renderer.clone(),
                         self.render_image.clone(),
+                        self.scene.clone(),
                     )));
                 }
             });

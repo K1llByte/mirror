@@ -26,7 +26,11 @@ pub enum MirrorPacket {
     SyncScene(Scene),
     /// Tile render request packet type, used to request peer to render tile
     /// packet.
-    RenderTileRequest((usize, usize), (usize, usize)),
+    RenderTileRequest {
+        begin_pos: (usize, usize),
+        tile_size: (usize, usize),
+        image_size: (usize, usize),
+    },
     /// Tile render response packet type, response oof the RenderTileRequest
     /// packet type.
     RenderTileResponse(Image),

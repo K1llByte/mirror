@@ -15,6 +15,7 @@ use tracing::{debug, error, info, trace, warn};
 use crate::image::Tile;
 use crate::packet::{MirrorPacket, PacketError};
 use crate::renderer::Renderer;
+use crate::scene::Scene;
 
 pub type PeerTable = Arc<Mutex<HashMap<SocketAddr, Peer>>>;
 
@@ -185,6 +186,8 @@ pub fn peer_task(
                 .unwrap()
         }
 
+        let mut scene: Option<Scene> = None;
+
         // 5. Proceed with normal flow.
         'outer: loop {
             match MirrorPacket::read(&mut read_socket).await {
@@ -214,17 +217,38 @@ pub fn peer_task(
                             .collect::<Vec<_>>()
                     );
                 }
-                Ok(MirrorPacket::SyncScene(scene)) => {
-                    debug!("[{tag}, {}] Received scene: {:?}", task::id(), scene);
+                Ok(MirrorPacket::SyncScene(received_scene)) => {
+                    debug!(
+                        "[{tag}, {}] Received scene: {:?}",
+                        task::id(),
+                        received_scene
+                    );
+                    scene = Some(received_scene);
                 }
 
-                Ok(MirrorPacket::RenderTileRequest(begin_pos, tile_size)) => {
+                Ok(MirrorPacket::RenderTileRequest {
+                    begin_pos,
+                    tile_size,
+                    image_size,
+                }) => {
                     debug!("[{tag}, {}] Received render tile request", task::id());
+                    if scene.is_none() {
+                        warn!(
+                            "[{tag}, {}] Scene was not synchronized before render request. Ignoring ...",
+                            task::id()
+                        );
+                        continue;
+                    }
+                    let tile = renderer.render_tile(
+                        scene.as_ref().unwrap(),
+                        begin_pos,
+                        tile_size,
+                        image_size,
+                    );
                     let mut peer_table_guard = renderer.peer_table.lock().await;
                     let peer = peer_table_guard
                         .get_mut(&peer_listen_address)
                         .expect("Should be available while this tasks runs");
-                    let tile = renderer.render_tile(begin_pos, tile_size);
                     if let Err(err) = MirrorPacket::RenderTileResponse(tile)
                         .write(&mut peer.write_socket)
                         .await

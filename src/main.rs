@@ -9,16 +9,19 @@ use tokio::sync::Mutex;
 use tracing::info;
 use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
+use crate::camera::Camera;
 use crate::config::Config;
 use crate::peer::{Peer, listen_task};
 use crate::renderer::Renderer;
-use crate::scene::{Camera, Scene, Sphere};
+use crate::scene::{Scene, Sphere};
 
 mod app;
+mod camera;
 mod config;
 mod image;
 mod packet;
 mod peer;
+mod ray;
 mod renderer;
 mod scene;
 
@@ -84,14 +87,10 @@ fn main() -> anyhow::Result<()> {
             position: Vec3::new(0.0, -100.5, -1.0),
             radius: 100.0,
         };
-        Arc::new(Mutex::new(Scene {
-            camera: Camera {
-                position: Vec3::ZERO,
-                width: 1920f32,
-                height: 1080f32,
-            },
+        Arc::new(Scene {
+            camera: Camera::new(Vec3::ZERO, 1920f32, 1080f32),
             objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
-        }))
+        })
     };
 
     let listen_task_future = runtime.spawn(listen_task(
