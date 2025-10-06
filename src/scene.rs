@@ -1,12 +1,15 @@
+use std::sync::Arc;
+
 use bincode::{Decode, Encode};
 use glam::Vec3;
 
-use crate::{camera::Camera, ray::Ray};
+use crate::{camera::Camera, material::Material, ray::Ray};
 
 pub struct Hit {
     pub distance: f32,
     pub position: Vec3,
     pub normal: Vec3,
+    pub material: Arc<Material>,
     pub is_front_face: bool,
 }
 
@@ -23,14 +26,20 @@ pub struct Sphere {
     pub radius: f32,
 }
 
-impl Hittable for Sphere {
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct Model {
+    pub geometry: Sphere,
+    pub material: Arc<Material>,
+}
+
+impl Hittable for Model {
     fn hit(&self, ray: &Ray) -> Option<Hit> {
         const MIN_RAY_DISTANCE: f32 = 0.001;
 
-        let oc = self.position - ray.origin();
+        let oc = self.geometry.position - ray.origin();
         let a = ray.direction().dot(ray.direction());
         let half_b = ray.direction().dot(oc);
-        let c = oc.length_squared() - self.radius * self.radius;
+        let c = oc.length_squared() - self.geometry.radius * self.geometry.radius;
         let discriminant = half_b * half_b - a * c;
 
         // Check if first solution is valid
@@ -48,7 +57,7 @@ impl Hittable for Sphere {
 
         if discriminant >= 0.0 {
             let position = ray.at(distance);
-            let outward_normal = (position - self.position) / self.radius;
+            let outward_normal = (position - self.geometry.position) / self.geometry.radius;
             let is_front_face = outward_normal.dot(ray.direction()) <= 0.0;
             let normal = if is_front_face {
                 outward_normal
@@ -60,6 +69,7 @@ impl Hittable for Sphere {
                 distance,
                 position,
                 normal,
+                material: self.material.clone(),
                 is_front_face,
             })
         } else {
@@ -71,7 +81,7 @@ impl Hittable for Sphere {
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct Scene {
     pub camera: Camera,
-    pub objects: Vec<Sphere>,
+    pub objects: Vec<Model>,
 }
 
 impl Hittable for Scene {

@@ -11,20 +11,22 @@ use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
 use crate::camera::Camera;
 use crate::config::Config;
+use crate::material::Material;
 use crate::peer::{Peer, listen_task};
 use crate::renderer::Renderer;
-use crate::scene::{Scene, Sphere};
+use crate::scene::{Model, Scene, Sphere};
 
 mod app;
 mod camera;
 mod config;
 mod image;
+mod material;
 mod packet;
 mod peer;
 mod ray;
 mod renderer;
 mod scene;
-mod utis;
+mod utils;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -42,6 +44,64 @@ impl FormatTime for CustomTime {
     fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
         write!(w, "[{}]", Local::now().format("%H:%M:%S"))
         // write!(w, "[{}]", Local::now().format("%d/%m/%y %H:%M:%S"))
+    }
+}
+
+fn create_scene(image_size: (usize, usize)) -> Scene {
+    // Spheres
+    let sphere_left = Sphere {
+        position: Vec3::new(-1.0, 0.0, -1.0),
+        radius: 0.5,
+    };
+    let sphere_center = Sphere {
+        position: Vec3::new(0.0, 0.0, -1.0),
+        radius: 0.5,
+    };
+    let sphere_right = Sphere {
+        position: Vec3::new(1.0, 0.0, -1.0),
+        radius: 0.5,
+    };
+    let sphere_ground = Sphere {
+        position: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+    };
+
+    // Materials
+    let ground_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.8, 0.8, 0.0),
+    });
+    let center_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.1, 0.2, 0.5),
+    });
+    let left_mat = Arc::new(Material::Dielectric {
+        refraction_index: 1.5,
+    });
+    let right_mat = Arc::new(Material::Metalic {
+        albedo: Vec3::new(0.8, 0.6, 0.2),
+        fuzzyness: 1.5,
+    });
+
+    // Scene
+    Scene {
+        camera: Camera::new(Vec3::ZERO, image_size.0 as f32, image_size.1 as f32),
+        objects: vec![
+            Model {
+                geometry: sphere_left,
+                material: left_mat.clone(), // center_mat.clone(),
+            },
+            Model {
+                geometry: sphere_center,
+                material: center_mat.clone(),
+            },
+            Model {
+                geometry: sphere_right,
+                material: right_mat.clone(),
+            },
+            Model {
+                geometry: sphere_ground,
+                material: ground_mat.clone(),
+            },
+        ],
     }
 }
 
@@ -71,28 +131,7 @@ fn main() -> anyhow::Result<()> {
 
     let peer_table = Arc::new(Mutex::new(HashMap::<SocketAddr, Peer>::new()));
     let renderer = Arc::new(Renderer::new(peer_table.clone()));
-    let scene = {
-        let sphere_left = Sphere {
-            position: Vec3::new(-1.0, 0.0, -1.0),
-            radius: 0.5,
-        };
-        let sphere_center = Sphere {
-            position: Vec3::new(0.0, 0.0, -1.0),
-            radius: 0.5,
-        };
-        let sphere_right = Sphere {
-            position: Vec3::new(1.0, 0.0, -1.0),
-            radius: 0.5,
-        };
-        let sphere_ground = Sphere {
-            position: Vec3::new(0.0, -100.5, -1.0),
-            radius: 100.0,
-        };
-        Arc::new(Scene {
-            camera: Camera::new(Vec3::ZERO, 1280f32, 720f32),
-            objects: vec![sphere_left, sphere_center, sphere_right, sphere_ground],
-        })
-    };
+    let scene = Arc::new(create_scene((1280, 720)));
 
     let listen_task_future = runtime.spawn(listen_task(
         renderer.clone(),

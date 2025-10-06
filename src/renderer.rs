@@ -20,7 +20,7 @@ use crate::{
     peer::PeerTable,
     ray::Ray,
     scene::{Hittable, Scene},
-    utis::random_vector,
+    utils::random_vector,
 };
 
 pub struct Renderer {
@@ -45,14 +45,10 @@ impl Renderer {
         }
 
         if let Some(hit) = scene.hit(&ray) {
-            let direction = hit.normal + random_vector(&mut rand::rng());
-            return Vec3::new(0.2, 0.4, 0.6)
-                * self.trace(scene, &Ray::new(hit.position, direction), depth - 1);
-
-            // if let Some(scattered) = hit.material.scatter(ray, &hit) {
-            //     return scattered.attenuation * self.trace(scene, &scattered.ray, depth - 1);
-            // }
-            // return Vec3::new(0.2, 0.2, 0.2);
+            if let Some(scattered) = hit.material.scatter(ray, &hit) {
+                return scattered.attenuation * self.trace(scene, &scattered.ray, depth - 1);
+            }
+            return Vec3::new(0.2, 0.2, 0.2);
         }
 
         let a = 0.5 * (ray.direction().normalize().y + 1.0);

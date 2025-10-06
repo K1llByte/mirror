@@ -1,12 +1,23 @@
+use bincode::{Decode, Encode};
 use glam::Vec3;
 use rand::thread_rng;
 
-use crate::{Hit, Ray, random_vector, reflect, refract};
+use crate::{ray::Ray, scene::Hit, utils};
 
+#[derive(Debug, Clone, Encode, Decode)]
 pub enum Material {
-    Diffuse { albedo: Vec3 },
-    Metalic { albedo: Vec3, fuzzyness: f32 },
-    Dielectric { refraction_index: f32 },
+    Diffuse {
+        #[bincode(with_serde)]
+        albedo: Vec3,
+    },
+    Metalic {
+        #[bincode(with_serde)]
+        albedo: Vec3,
+        fuzzyness: f32,
+    },
+    Dielectric {
+        refraction_index: f32,
+    },
 }
 
 pub struct ScatteredRay {
@@ -16,11 +27,11 @@ pub struct ScatteredRay {
 
 impl Material {
     pub fn scatter(&self, ray: &Ray, hit: &Hit) -> Option<ScatteredRay> {
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         match self {
             Self::Diffuse { albedo } => {
-                let direction = hit.normal + random_vector(&mut rng);
+                let direction = hit.normal + utils::random_vector(&mut rng);
 
                 // TODO: Check if direction is not near 0
 
@@ -30,10 +41,10 @@ impl Material {
                 })
             }
             Self::Metalic { albedo, fuzzyness } => {
-                let reflected_dir = reflect(ray.direction(), hit.normal).normalize();
+                let reflected_dir = utils::reflect(ray.direction(), hit.normal).normalize();
                 let scattered_ray = Ray::new(
                     hit.position,
-                    reflected_dir + *fuzzyness * random_vector(&mut rng),
+                    reflected_dir + *fuzzyness * utils::random_vector(&mut rng),
                 );
                 if scattered_ray.direction().dot(hit.normal) > 0.0 {
                     Some(ScatteredRay {
@@ -53,16 +64,12 @@ impl Material {
                     *refraction_index
                 };
 
-                let refracted = refract(ray.direction().normalize(), hit.normal, ri);
+                let refracted = utils::refract(ray.direction().normalize(), hit.normal, ri);
 
                 Some(ScatteredRay {
                     ray: Ray::new(hit.position, refracted),
                     attenuation,
                 })
-            }
-            _ => {
-                println!("Shouldn't be here");
-                None
             }
         }
     }
