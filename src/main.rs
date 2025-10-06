@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::num::NonZero;
 use std::sync::Arc;
+use std::thread;
 
 use chrono::Local;
 use clap::Parser;
@@ -107,7 +109,17 @@ fn create_scene(image_size: (usize, usize)) -> Scene {
 
 fn main() -> anyhow::Result<()> {
     // Create tokio runtime.
-    let runtime = tokio::runtime::Runtime::new()?;
+    // let runtime = tokio::runtime::Runtime::new()?;
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(
+            thread::available_parallelism()
+                .map(NonZero::get)
+                .unwrap_or(4),
+        )
+        .enable_io()
+        .build()
+        .unwrap();
+
     // Load command line arguments.
     let args = Args::try_parse()?;
 

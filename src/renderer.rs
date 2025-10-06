@@ -11,7 +11,7 @@ use async_channel::Receiver;
 use futures::future;
 use glam::Vec3;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task};
 use tracing::{debug, error, info};
 
 use crate::{
@@ -107,6 +107,12 @@ async fn local_render_tile_task(
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
+            // info!(
+            //     "[{}] Begin render tile ({:?}) ({:?})",
+            //     task::id(),
+            //     tile_render_work.begin_pos,
+            //     tile_render_work.tile_size
+            // );
             // Do work
             let tile = renderer.render_tile(
                 &scene,
@@ -114,6 +120,12 @@ async fn local_render_tile_task(
                 tile_render_work.tile_size,
                 image_size,
             );
+            // info!(
+            //     "[{}] End render tile ({:?}) ({:?})",
+            //     task::id(),
+            //     tile_render_work.begin_pos,
+            //     tile_render_work.tile_size
+            // );
             // Insert result tile in render_image
             render_image
                 .lock()
@@ -207,9 +219,10 @@ pub async fn render_task(
 
     let (work_send_queue, work_recv_queue) = async_channel::unbounded::<TileRenderWork>();
 
-    let num_local_tasks = thread::available_parallelism()
-        .map(NonZero::get)
-        .unwrap_or(1);
+    // let num_local_tasks = thread::available_parallelism()
+    //     .map(NonZero::get)
+    //     .unwrap_or(1);
+    let num_local_tasks = 4;
     let num_remote_tasks = renderer.peer_table.lock().await.len();
 
     let mut join_handles = Vec::with_capacity(num_local_tasks + num_remote_tasks);
@@ -225,15 +238,15 @@ pub async fn render_task(
         )));
     }
     // - Remote render_tile tasks: As many as connected peers.
-    for peer_listen_address in renderer.peer_table.lock().await.keys().cloned() {
-        join_handles.push(tokio::spawn(remote_render_tile_task(
-            work_recv_queue.clone(),
-            renderer.clone(),
-            render_image.clone(),
-            scene.clone(),
-            peer_listen_address,
-        )));
-    }
+    // for peer_listen_address in renderer.peer_table.lock().await.keys().cloned() {
+    //     join_handles.push(tokio::spawn(remote_render_tile_task(
+    //         work_recv_queue.clone(),
+    //         renderer.clone(),
+    //         render_image.clone(),
+    //         scene.clone(),
+    //         peer_listen_address,
+    //     )));
+    // }
 
     // Loop over all tiles splitted to be rendered. This loop takes into
     // account the last remainder tiles that could not be of size
