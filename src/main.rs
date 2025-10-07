@@ -85,7 +85,14 @@ fn create_scene(image_size: (usize, usize)) -> Scene {
 
     // Scene
     Scene {
-        camera: Camera::new(Vec3::ZERO, image_size.0 as f32, image_size.1 as f32),
+        // camera: Camera::new(Vec3::ZERO, image_size.0 as f32, image_size.1 as f32),
+        camera: Camera::new(
+            Vec3::ZERO,
+            Vec3::new(0.0, 0.0, -1.0).normalize(),
+            Vec3::new(0.0, -1.0, 0.0).normalize(),
+            100.0,
+            image_size.0 as f32 / image_size.1 as f32,
+        ),
         objects: vec![
             Model {
                 geometry: sphere_left,
@@ -156,7 +163,7 @@ fn main() -> anyhow::Result<()> {
         eframe::run_native(
             "Mirror App",
             options,
-            Box::new(|_cc| {
+            Box::new(|_| {
                 Ok(Box::new(app::MirrorApp::new(
                     runtime,
                     renderer.clone(),

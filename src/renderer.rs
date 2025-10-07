@@ -65,21 +65,32 @@ impl Renderer {
         let mut tile = Tile::new(tile_size);
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
-        // let random_rbg: [f32; _] = [rng.random(), rng.random(), rng.random()];
-
         let sample_weight = 1.0 / (self.samples_per_pixel as f32);
         for v in 0..tile_size.1 {
             for u in 0..tile_size.0 {
                 let mut pixel_color = Vec3::ZERO;
                 // Ray trace for each sample
                 for _ in 0..self.samples_per_pixel {
-                    let sample_u = (u + begin_pos.0) as f32 + rng.random_range(0.0..1.0);
-                    let sample_v = (v + begin_pos.1) as f32 + rng.random_range(0.0..1.0);
+                    // // Using Camera implementation
+                    // let sample_u = (u + begin_pos.0) as f32 + rng.random_range(0.0..1.0);
+                    // let sample_v = (v + begin_pos.1) as f32 + rng.random_range(0.0..1.0);
+
+                    // // Trace pixel color
+                    // let ray = scene.camera.create_viewport_ray(sample_u, sample_v);
+                    // let sample_color = self.trace(&scene, &ray, self.max_bounces);
+
+                    // pixel_color += sample_color * sample_weight;
+
+                    ////////////////////////////////////////////////////////////////
+                    // Using Camera2 implementation
+                    let sample_u = (2.0 * (u + begin_pos.0) as f32 / image_size.0 as f32) - 1.0
+                        + rng.random_range(0.0..(2.0 / image_size.0 as f32));
+                    let sample_v = (2.0 * (v + begin_pos.1) as f32 / image_size.1 as f32) - 1.0
+                        + rng.random_range(0.0..(2.0 / image_size.1 as f32));
 
                     // Trace pixel color
                     let ray = scene.camera.create_viewport_ray(sample_u, sample_v);
                     let sample_color = self.trace(&scene, &ray, self.max_bounces);
-                    // let sample_color = Vec3::new(random_rbg[0], random_rbg[1], random_rbg[2]);
 
                     pixel_color += sample_color * sample_weight;
                 }
@@ -107,12 +118,6 @@ async fn local_render_tile_task(
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
-            // info!(
-            //     "[{}] Begin render tile ({:?}) ({:?})",
-            //     task::id(),
-            //     tile_render_work.begin_pos,
-            //     tile_render_work.tile_size
-            // );
             // Do work
             let tile = renderer.render_tile(
                 &scene,
@@ -120,12 +125,6 @@ async fn local_render_tile_task(
                 tile_render_work.tile_size,
                 image_size,
             );
-            // info!(
-            //     "[{}] End render tile ({:?}) ({:?})",
-            //     task::id(),
-            //     tile_render_work.begin_pos,
-            //     tile_render_work.tile_size
-            // );
             // Insert result tile in render_image
             render_image
                 .lock()
