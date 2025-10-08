@@ -2,17 +2,20 @@ use std::{
     cmp::min,
     net::SocketAddr,
     num::NonZero,
-    sync::Arc,
-    thread::{self, sleep},
-    time::{Duration, Instant},
+    sync::{
+        Arc,
+        atomic::{self, AtomicUsize},
+    },
+    thread,
+    time::Instant,
 };
 
 use async_channel::Receiver;
 use futures::future;
 use glam::Vec3;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
-use tokio::{sync::Mutex, task};
-use tracing::{debug, error, info};
+use tokio::sync::Mutex;
+use tracing::{error, info};
 
 use crate::{
     image::{Image, Tile},
@@ -20,12 +23,12 @@ use crate::{
     peer::PeerTable,
     ray::Ray,
     scene::{Hittable, Scene},
-    utils::random_vector,
 };
 
 pub struct Renderer {
     pub peer_table: PeerTable,
     samples_per_pixel: usize,
+    times_sampled: AtomicUsize,
     max_bounces: usize,
 }
 
@@ -33,9 +36,23 @@ impl Renderer {
     pub fn new(pt: PeerTable) -> Self {
         Self {
             peer_table: pt,
-            samples_per_pixel: 4,
+            samples_per_pixel: 2,
             max_bounces: 10,
+            times_sampled: AtomicUsize::new(0),
         }
+    }
+
+    pub fn samples_per_pixel(&self) -> usize {
+        self.samples_per_pixel
+    }
+
+    pub fn times_sampled(&self) -> usize {
+        self.times_sampled.load(atomic::Ordering::Acquire)
+    }
+
+    pub fn update_times_sampled(&self) {
+        self.times_sampled
+            .fetch_add(self.samples_per_pixel, atomic::Ordering::Acquire);
     }
 
     pub fn trace(&self, scene: &Scene, ray: &Ray, depth: usize) -> Vec3 {
@@ -71,18 +88,6 @@ impl Renderer {
                 let mut pixel_color = Vec3::ZERO;
                 // Ray trace for each sample
                 for _ in 0..self.samples_per_pixel {
-                    // // Using Camera implementation
-                    // let sample_u = (u + begin_pos.0) as f32 + rng.random_range(0.0..1.0);
-                    // let sample_v = (v + begin_pos.1) as f32 + rng.random_range(0.0..1.0);
-
-                    // // Trace pixel color
-                    // let ray = scene.camera.create_viewport_ray(sample_u, sample_v);
-                    // let sample_color = self.trace(&scene, &ray, self.max_bounces);
-
-                    // pixel_color += sample_color * sample_weight;
-
-                    ////////////////////////////////////////////////////////////////
-                    // Using Camera2 implementation
                     let sample_u = (2.0 * (u + begin_pos.0) as f32 / image_size.0 as f32) - 1.0
                         + rng.random_range(0.0..(2.0 / image_size.0 as f32));
                     let sample_v = (2.0 * (v + begin_pos.1) as f32 / image_size.1 as f32) - 1.0
@@ -114,6 +119,10 @@ async fn local_render_tile_task(
     render_image: Arc<Mutex<Image>>,
     scene: Arc<Scene>,
 ) {
+    let total_samples = renderer.samples_per_pixel() + renderer.times_sampled();
+    let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
+    let new_sample_weight = 1.0 / (total_samples as f32);
+
     let image_size = render_image.lock().await.size();
     loop {
         // Receive work
@@ -129,7 +138,9 @@ async fn local_render_tile_task(
             render_image
                 .lock()
                 .await
-                .insert_tile(&tile, tile_render_work.begin_pos);
+                .insert_tile_by(&tile, tile_render_work.begin_pos, |c, n| {
+                    c * sampled_weight + n * new_sample_weight
+                });
         } else {
             break;
         }
@@ -143,6 +154,10 @@ async fn remote_render_tile_task(
     scene: Arc<Scene>,
     peer_listen_address: SocketAddr,
 ) {
+    let total_samples = renderer.samples_per_pixel() + renderer.times_sampled();
+    let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
+    let new_sample_weight = 1.0 / (total_samples as f32);
+
     let image_size = render_image.lock().await.size();
 
     // Synchronize scene before requesting to render tiles
@@ -197,7 +212,9 @@ async fn remote_render_tile_task(
             render_image
                 .lock()
                 .await
-                .insert_tile(&tile, tile_render_work.begin_pos);
+                .insert_tile_by(&tile, tile_render_work.begin_pos, |c, n| {
+                    c * sampled_weight + n * new_sample_weight
+                });
         } else {
             break;
         }
@@ -218,10 +235,9 @@ pub async fn render_task(
 
     let (work_send_queue, work_recv_queue) = async_channel::unbounded::<TileRenderWork>();
 
-    // let num_local_tasks = thread::available_parallelism()
-    //     .map(NonZero::get)
-    //     .unwrap_or(1);
-    let num_local_tasks = 4;
+    let num_local_tasks = thread::available_parallelism()
+        .map(NonZero::get)
+        .unwrap_or(1);
     let num_remote_tasks = renderer.peer_table.lock().await.len();
 
     let mut join_handles = Vec::with_capacity(num_local_tasks + num_remote_tasks);
@@ -237,15 +253,15 @@ pub async fn render_task(
         )));
     }
     // - Remote render_tile tasks: As many as connected peers.
-    // for peer_listen_address in renderer.peer_table.lock().await.keys().cloned() {
-    //     join_handles.push(tokio::spawn(remote_render_tile_task(
-    //         work_recv_queue.clone(),
-    //         renderer.clone(),
-    //         render_image.clone(),
-    //         scene.clone(),
-    //         peer_listen_address,
-    //     )));
-    // }
+    for peer_listen_address in renderer.peer_table.lock().await.keys().cloned() {
+        join_handles.push(tokio::spawn(remote_render_tile_task(
+            work_recv_queue.clone(),
+            renderer.clone(),
+            render_image.clone(),
+            scene.clone(),
+            peer_listen_address,
+        )));
+    }
 
     // Loop over all tiles splitted to be rendered. This loop takes into
     // account the last remainder tiles that could not be of size
@@ -271,12 +287,13 @@ pub async fn render_task(
                 .unwrap();
         }
     }
-
     // Close channel so that tasks can finish and join
     work_send_queue.close();
 
     // Join all work task handles
     future::join_all(join_handles).await;
+
+    renderer.update_times_sampled();
 
     // Log render time
     info!("Render time: {} ms", render_time.elapsed().as_millis());

@@ -63,6 +63,14 @@ impl Image {
             value.z.clamp(0.0, 1.0);
     }
 
+    pub fn clear(&mut self, value: Vec3) {
+        for y in 0..self.extent.1 {
+            for x in 0..self.extent.0 {
+                self.set(x, y, value);
+            }
+        }
+    }
+
     pub fn insert_tile(&mut self, tile: &Tile, pos: (usize, usize)) {
         assert!(
             pos.0 + tile.size().0 <= self.size().0 && pos.1 + tile.size().1 <= self.size().1,
@@ -71,6 +79,27 @@ impl Image {
         for ty in 0..tile.height() {
             for tx in 0..tile.width() {
                 self.set(pos.0 + tx, pos.1 + ty, tile.get(tx, ty));
+            }
+        }
+    }
+
+    pub fn insert_tile_by<F: Fn(Vec3, Vec3) -> Vec3>(
+        &mut self,
+        tile: &Tile,
+        pos: (usize, usize),
+        func: F,
+    ) {
+        assert!(
+            pos.0 + tile.size().0 <= self.size().0 && pos.1 + tile.size().1 <= self.size().1,
+            "Invalid image tile insertion"
+        );
+        for ty in 0..tile.height() {
+            for tx in 0..tile.width() {
+                self.set(
+                    pos.0 + tx,
+                    pos.1 + ty,
+                    func(self.get(pos.0 + tx, pos.1 + ty), tile.get(tx, ty)),
+                );
             }
         }
     }

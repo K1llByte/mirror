@@ -1,9 +1,11 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{Arc, atomic::AtomicUsize},
+    time::Duration,
+};
 
 use eframe::egui::{self, ColorImage, Key, TextureHandle, Ui, load::Bytes};
 use egui_extras::{Column, TableBuilder};
 use tokio::{runtime::Runtime, sync::Mutex, task::JoinHandle};
-use tracing::debug;
 
 use crate::{
     image::Image,
