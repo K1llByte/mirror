@@ -24,6 +24,7 @@ pub struct MirrorApp {
     enable_side_panel: bool,
     texture: Option<egui::TextureHandle>,
     render_join_handle: Option<JoinHandle<()>>,
+    progressive_rendering: bool,
 }
 
 impl MirrorApp {
@@ -32,12 +33,13 @@ impl MirrorApp {
             // Backend data
             runtime,
             renderer,
-            render_image: Arc::new(Mutex::new(Image::new((1280, 720)))),
+            render_image: Arc::new(Mutex::new(Image::new((400, 300)))),
             scene,
             // Ui data
             enable_side_panel: true,
             texture: None,
             render_join_handle: None,
+            progressive_rendering: false,
         }
     }
 
@@ -57,7 +59,17 @@ impl MirrorApp {
                 image_data,
                 Default::default(),
             ));
-            self.render_join_handle = None;
+
+            self.render_join_handle = if self.progressive_rendering {
+                Some(self.runtime.spawn(renderer::render_task(
+                    self.renderer.clone(),
+                    self.render_image.clone(),
+                    self.scene.clone(),
+                )))
+            } else {
+                None
+            };
+
             self.texture.as_ref().unwrap()
         } else {
             self.texture.get_or_insert_with(|| {
@@ -126,11 +138,13 @@ impl eframe::App for MirrorApp {
 
                 ui.separator();
 
+                ui.checkbox(&mut self.progressive_rendering, "Progressive Rendering");
+                ui.add_space(3.0);
+
                 let is_rendering = self
                     .render_join_handle
                     .as_ref()
                     .is_some_and(|fut| !fut.is_finished());
-
                 let render_button = ui.add_enabled(!is_rendering, |ui: &mut Ui| {
                     ui.add_sized(
                         [ui.available_width(), 0.0],

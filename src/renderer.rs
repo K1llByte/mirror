@@ -36,7 +36,7 @@ impl Renderer {
     pub fn new(pt: PeerTable) -> Self {
         Self {
             peer_table: pt,
-            samples_per_pixel: 2,
+            samples_per_pixel: 1,
             max_bounces: 10,
             times_sampled: AtomicUsize::new(0),
         }
@@ -296,5 +296,9 @@ pub async fn render_task(
     renderer.update_times_sampled();
 
     // Log render time
-    info!("Render time: {} ms", render_time.elapsed().as_millis());
+    info!(
+        "Rendered {} sample(s) in {} ms",
+        renderer.samples_per_pixel(),
+        render_time.elapsed().as_millis()
+    );
 }
