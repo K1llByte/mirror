@@ -36,7 +36,7 @@ impl Renderer {
     pub fn new(pt: PeerTable) -> Self {
         Self {
             peer_table: pt,
-            samples_per_pixel: 1,
+            samples_per_pixel: 4,
             max_bounces: 10,
             times_sampled: AtomicUsize::new(0),
         }

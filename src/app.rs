@@ -33,7 +33,7 @@ impl MirrorApp {
             // Backend data
             runtime,
             renderer,
-            render_image: Arc::new(Mutex::new(Image::new((400, 300)))),
+            render_image: Arc::new(Mutex::new(Image::new((1280, 720)))),
             scene,
             // Ui data
             enable_side_panel: true,
@@ -139,6 +139,7 @@ impl eframe::App for MirrorApp {
                 ui.separator();
 
                 ui.checkbox(&mut self.progressive_rendering, "Progressive Rendering");
+
                 ui.add_space(3.0);
 
                 let is_rendering = self

@@ -150,7 +150,7 @@ fn main() -> anyhow::Result<()> {
 
     let peer_table = Arc::new(Mutex::new(HashMap::<SocketAddr, Peer>::new()));
     let renderer = Arc::new(Renderer::new(peer_table.clone()));
-    let scene = Arc::new(create_scene((400, 300)));
+    let scene = Arc::new(create_scene((1280, 720)));
 
     let listen_task_future = runtime.spawn(listen_task(
         renderer.clone(),
