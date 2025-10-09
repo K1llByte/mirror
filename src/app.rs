@@ -64,7 +64,6 @@ impl MirrorApp {
 
     fn show_render_image(&mut self, ui: &mut egui::Ui) {
         // FIXME: Turn blocking lock into try_lock to avoid ui blocking
-        let image_size: [usize; 2] = self.render_image.blocking_lock().size().into();
 
         let texture: &TextureHandle = if self
             .render_join_handle
@@ -72,6 +71,7 @@ impl MirrorApp {
             .is_some_and(|fut| fut.is_finished())
             || self.present_framebuffer
         {
+            let image_size: [usize; 2] = self.render_image.blocking_lock().size().into();
             let image_bytes =
                 Bytes::Shared(Arc::from(self.render_image.blocking_lock().to_bytes()));
             let image_data = ColorImage::from_rgb(image_size, image_bytes.as_ref());
