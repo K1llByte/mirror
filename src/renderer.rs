@@ -116,18 +116,14 @@ async fn local_render_tile_task(
     scene: Arc<Scene>,
     samples_per_pixel: usize,
 ) {
-    let mut time_rendering: u128 = 0;
-
-    let total_samples = samples_per_pixel + renderer.times_sampled();
-
     let mut rendered_tiles = Vec::new();
 
+    // Do render work until theres no more
     let image_size = render_image.lock().await.size();
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
-            let measure_render = Instant::now();
             let tile = renderer.render_tile(
                 &scene,
                 samples_per_pixel,
@@ -135,15 +131,15 @@ async fn local_render_tile_task(
                 tile_render_work.tile_size,
                 image_size,
             );
-            time_rendering += measure_render.elapsed().as_millis();
             rendered_tiles.push((tile_render_work.begin_pos, tile));
-            // Insert result tile in render_image
         } else {
             break;
         }
     }
 
+    // Insert result tiles in render_image
     {
+        let total_samples = samples_per_pixel + renderer.times_sampled();
         let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
         let new_sample_weight = 1.0 / (total_samples as f32);
         let mut image_guard = render_image.lock().await;
@@ -153,8 +149,6 @@ async fn local_render_tile_task(
             });
         }
     }
-
-    info!("{} Time spent rendering: {} ms", task::id(), time_rendering);
 }
 
 async fn remote_render_tile_task(
@@ -165,9 +159,7 @@ async fn remote_render_tile_task(
     peer_listen_address: SocketAddr,
     samples_per_pixel: usize,
 ) {
-    let total_samples = samples_per_pixel + renderer.times_sampled();
-    let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
-    let new_sample_weight = 1.0 / (total_samples as f32);
+    let mut rendered_tiles = Vec::new();
 
     let image_size = render_image.lock().await.size();
 
@@ -187,6 +179,7 @@ async fn remote_render_tile_task(
         }
     }
 
+    // Do render work until theres no more
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
@@ -220,15 +213,22 @@ async fn remote_render_tile_task(
                 }
             };
 
-            // Insert result tile in render_image
-            render_image
-                .lock()
-                .await
-                .insert_tile_by(&tile, tile_render_work.begin_pos, |c, n| {
-                    c * sampled_weight + n * new_sample_weight
-                });
+            rendered_tiles.push((tile_render_work.begin_pos, tile));
         } else {
             break;
+        }
+    }
+
+    // Insert result tiles in render_image
+    {
+        let total_samples = samples_per_pixel + renderer.times_sampled();
+        let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
+        let new_sample_weight = 1.0 / (total_samples as f32);
+        let mut image_guard = render_image.lock().await;
+        for (begin_pos, tile) in rendered_tiles {
+            image_guard.insert_tile_by(&tile, begin_pos, |c, n| {
+                c * sampled_weight + n * new_sample_weight
+            });
         }
     }
 }
