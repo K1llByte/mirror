@@ -29,6 +29,7 @@ pub struct MirrorApp {
     progressive_rendering: bool,
     samples_per_pixel: usize,
     framebuffer_size: (usize, usize),
+    cached_peers_info: Vec<(Option<String>, String)>,
 }
 
 impl MirrorApp {
@@ -41,14 +42,24 @@ impl MirrorApp {
             render_image: Arc::new(Mutex::new(Image::new(framebuffer_size))),
             scene,
             // Ui data
-            present_framebuffer: true,
+            present_framebuffer: false,
             enable_side_panel: true,
             texture: None,
             render_join_handle: None,
             progressive_rendering: false,
             samples_per_pixel: 1,
             framebuffer_size,
+            cached_peers_info: vec![],
         }
+    }
+
+    fn spawn_render_task(&mut self) {
+        self.render_join_handle = Some(self.runtime.spawn(renderer::render_task(
+            self.renderer.clone(),
+            self.render_image.clone(),
+            self.scene.clone(),
+            self.samples_per_pixel,
+        )));
     }
 
     fn show_render_image(&mut self, ui: &mut egui::Ui) {
@@ -59,6 +70,7 @@ impl MirrorApp {
             .render_join_handle
             .as_ref()
             .is_some_and(|fut| fut.is_finished())
+            || self.present_framebuffer
         {
             let image_bytes =
                 Bytes::Shared(Arc::from(self.render_image.blocking_lock().to_bytes()));
@@ -69,23 +81,19 @@ impl MirrorApp {
                 Default::default(),
             ));
 
-            self.render_join_handle = if self.progressive_rendering {
-                Some(self.runtime.spawn(renderer::render_task(
-                    self.renderer.clone(),
-                    self.render_image.clone(),
-                    self.scene.clone(),
-                    self.samples_per_pixel,
-                )))
+            if self.progressive_rendering {
+                self.spawn_render_task();
             } else {
-                None
+                self.render_join_handle = None;
             };
+            self.present_framebuffer = false;
 
             self.texture.as_ref().unwrap()
         } else {
             self.texture.get_or_insert_with(|| {
-                let image_bytes =
-                    Bytes::Shared(Arc::from(vec![20u8; image_size[0] * image_size[1] * 3]));
-                let image_data = ColorImage::from_rgb(image_size, image_bytes.as_ref());
+                // This is only to fill the background with a default color
+                let image_bytes = Bytes::Shared(Arc::from(vec![20u8; 3]));
+                let image_data = ColorImage::from_rgb([1, 1], image_bytes.as_ref());
 
                 ui.ctx()
                     .load_texture("render_image", image_data, Default::default())
@@ -93,6 +101,44 @@ impl MirrorApp {
         };
 
         egui::Image::new((texture.id(), texture.size_vec2())).paint_at(ui, ui.ctx().screen_rect());
+    }
+
+    fn show_connected_peers(&mut self, ui: &mut egui::Ui) {
+        // NOTE: Since Im using try_lock to get peers info to avoid blocking
+        // ui task, I use a Vec to cache the info when its not possible to get
+        // the lock guard.
+        if let Ok(peer_table_guard) = self.renderer.peer_table.try_lock() {
+            self.cached_peers_info = peer_table_guard
+                .keys()
+                .map(|a| (peer_table_guard.get(a).unwrap().name.clone(), a.to_string()))
+                .collect();
+        }
+
+        if self.cached_peers_info.len() == 0 {
+            ui.label("No connected peers.");
+        } else {
+            TableBuilder::new(ui)
+                .striped(true)
+                .resizable(false)
+                .cell_layout(egui::Layout::left_to_right(egui::Align::Min))
+                .columns(Column::remainder(), 2)
+                .body(|mut body| {
+                    for (i, (name, address)) in self.cached_peers_info.iter().enumerate() {
+                        body.row(20.0, |mut row| {
+                            row.col(|ui| {
+                                ui.label(format!(
+                                    "{}: {}",
+                                    i + 1,
+                                    name.as_deref().unwrap_or("<unnamed>")
+                                ));
+                            });
+                            row.col(|ui| {
+                                ui.label(address.to_string());
+                            });
+                        });
+                    }
+                });
+        }
     }
 }
 
@@ -119,42 +165,7 @@ impl eframe::App for MirrorApp {
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
                 ui.heading("Mirror");
                 ui.separator();
-
-                if let Ok(peer_table_guard) = self.renderer.peer_table.try_lock() {
-                    if peer_table_guard.keys().len() == 0 {
-                        ui.label("No connected peers.");
-                    } else {
-                        TableBuilder::new(ui)
-                            .striped(true)
-                            .resizable(false)
-                            .cell_layout(egui::Layout::left_to_right(egui::Align::Min))
-                            .columns(Column::remainder(), 2)
-                            .body(|mut body| {
-                                for (i, address) in peer_table_guard.keys().enumerate() {
-                                    body.row(20.0, |mut row| {
-                                        row.col(|ui| {
-                                            ui.label(format!(
-                                                "{}: {}",
-                                                i + 1,
-                                                peer_table_guard
-                                                    .get(&address)
-                                                    .unwrap()
-                                                    .name
-                                                    .clone()
-                                                    .unwrap_or("<unnamed>".into())
-                                            ));
-                                        });
-                                        row.col(|ui| {
-                                            ui.label(address.to_string());
-                                        });
-                                    });
-                                }
-                            });
-                    }
-                } else {
-                    ui.label("Loading...");
-                }
-
+                self.show_connected_peers(ui);
                 ui.separator();
 
                 let is_rendering = self
@@ -196,12 +207,7 @@ impl eframe::App for MirrorApp {
                     )
                 });
                 if render_button.clicked() {
-                    self.render_join_handle = Some(self.runtime.spawn(renderer::render_task(
-                        self.renderer.clone(),
-                        self.render_image.clone(),
-                        self.scene.clone(),
-                        self.samples_per_pixel,
-                    )));
+                    self.spawn_render_task();
                 }
 
                 // Clear Button
@@ -215,6 +221,7 @@ impl eframe::App for MirrorApp {
                     self.render_image
                         .blocking_lock()
                         .clear(Vec3::new(0.0, 0.0, 0.0));
+                    self.present_framebuffer = true;
                 }
             });
         }
