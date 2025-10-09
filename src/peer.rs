@@ -230,6 +230,7 @@ pub fn peer_task(
                     begin_pos,
                     tile_size,
                     image_size,
+                    samples_per_pixel,
                 }) => {
                     debug!("[{tag}, {}] Received render tile request", task::id());
                     if scene.is_none() {
@@ -241,6 +242,7 @@ pub fn peer_task(
                     }
                     let tile = renderer.render_tile(
                         scene.as_ref().unwrap(),
+                        samples_per_pixel,
                         begin_pos,
                         tile_size,
                         image_size,

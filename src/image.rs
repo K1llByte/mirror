@@ -71,6 +71,11 @@ impl Image {
         }
     }
 
+    pub fn resize(&mut self, new_extent: (usize, usize)) {
+        self.extent = new_extent;
+        self.data = vec![0.0; new_extent.0 * new_extent.1 * NUM_PIXEL_SAMPLES].into_boxed_slice();
+    }
+
     pub fn insert_tile(&mut self, tile: &Tile, pos: (usize, usize)) {
         assert!(
             pos.0 + tile.size().0 <= self.size().0 && pos.1 + tile.size().1 <= self.size().1,

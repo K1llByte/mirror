@@ -3,8 +3,9 @@ use std::{
     time::Duration,
 };
 
-use eframe::egui::{self, ColorImage, Key, TextureHandle, Ui, load::Bytes};
+use eframe::egui::{self, ColorImage, DragValue, Key, TextureHandle, Ui, load::Bytes};
 use egui_extras::{Column, TableBuilder};
+use glam::Vec3;
 use tokio::{runtime::Runtime, sync::Mutex, task::JoinHandle};
 
 use crate::{
@@ -21,29 +22,37 @@ pub struct MirrorApp {
     scene: Arc<Scene>,
 
     // Ui data
+    present_framebuffer: bool,
     enable_side_panel: bool,
     texture: Option<egui::TextureHandle>,
     render_join_handle: Option<JoinHandle<()>>,
     progressive_rendering: bool,
+    samples_per_pixel: usize,
+    framebuffer_size: (usize, usize),
 }
 
 impl MirrorApp {
     pub fn new(runtime: Runtime, renderer: Arc<Renderer>, scene: Arc<Scene>) -> Self {
+        let framebuffer_size = (1280, 720);
         Self {
             // Backend data
             runtime,
             renderer,
-            render_image: Arc::new(Mutex::new(Image::new((1280, 720)))),
+            render_image: Arc::new(Mutex::new(Image::new(framebuffer_size))),
             scene,
             // Ui data
+            present_framebuffer: true,
             enable_side_panel: true,
             texture: None,
             render_join_handle: None,
             progressive_rendering: false,
+            samples_per_pixel: 1,
+            framebuffer_size,
         }
     }
 
     fn show_render_image(&mut self, ui: &mut egui::Ui) {
+        // FIXME: Turn blocking lock into try_lock to avoid ui blocking
         let image_size: [usize; 2] = self.render_image.blocking_lock().size().into();
 
         let texture: &TextureHandle = if self
@@ -65,6 +74,7 @@ impl MirrorApp {
                     self.renderer.clone(),
                     self.render_image.clone(),
                     self.scene.clone(),
+                    self.samples_per_pixel,
                 )))
             } else {
                 None
@@ -88,14 +98,23 @@ impl MirrorApp {
 
 impl eframe::App for MirrorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut style: egui::Style = (*ctx.style()).clone();
+        style.spacing.item_spacing.y = 6.0;
+        ctx.set_style(style);
+
         // Force a repaint every second
-        ctx.request_repaint_after(Duration::from_secs_f32(0.1));
+        ctx.request_repaint_after(Duration::from_secs_f32(0.3));
 
         if ctx.input(|i| i.key_pressed(Key::Space)) {
             self.enable_side_panel = !self.enable_side_panel;
         }
 
         // Build ui
+        egui::CentralPanel::default().show(ctx, |ui| {
+            // Render image to background
+            self.show_render_image(ui);
+        });
+
         if self.enable_side_panel {
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
                 ui.heading("Mirror");
@@ -138,17 +157,37 @@ impl eframe::App for MirrorApp {
 
                 ui.separator();
 
-                ui.checkbox(&mut self.progressive_rendering, "Progressive Rendering");
-
-                ui.add_space(3.0);
-
                 let is_rendering = self
                     .render_join_handle
                     .as_ref()
                     .is_some_and(|fut| !fut.is_finished());
                 let render_button = ui.add_enabled(!is_rendering, |ui: &mut Ui| {
+                    // Framebuffer size Slider
+                    ui.horizontal(|ui| {
+                        ui.label("Framebuffer size");
+                        let fb_width_drag = ui.add(DragValue::new(&mut self.framebuffer_size.0));
+                        let fb_height_drag = ui.add(DragValue::new(&mut self.framebuffer_size.1));
+                        if fb_width_drag.changed() || fb_height_drag.changed() {
+                            self.render_image
+                                .blocking_lock()
+                                .resize(self.framebuffer_size);
+                        }
+                    });
+
+                    // Samples per pixel Slider
+                    ui.horizontal(|ui| {
+                        ui.label("Samples per pixel");
+                        ui.add(DragValue::new(&mut self.samples_per_pixel));
+                    });
+
+                    // Progressive rendering checkbox
+                    ui.checkbox(&mut self.progressive_rendering, "Progressive Rendering");
+
+                    ui.separator();
+
+                    // Render Button
                     ui.add_sized(
-                        [ui.available_width(), 0.0],
+                        [ui.available_width(), 30.0],
                         egui::Button::new(if is_rendering {
                             "Rendering ..."
                         } else {
@@ -161,14 +200,23 @@ impl eframe::App for MirrorApp {
                         self.renderer.clone(),
                         self.render_image.clone(),
                         self.scene.clone(),
+                        self.samples_per_pixel,
                     )));
+                }
+
+                // Clear Button
+                let clear_button =
+                    ui.add_sized([ui.available_width(), 0.0], egui::Button::new("Clear"));
+                if clear_button.clicked() {
+                    if let Some(render_join_handle) = &self.render_join_handle {
+                        render_join_handle.abort();
+                        self.render_join_handle = None;
+                    }
+                    self.render_image
+                        .blocking_lock()
+                        .clear(Vec3::new(0.0, 0.0, 0.0));
                 }
             });
         }
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // Render image to background
-            self.show_render_image(ui);
-        });
     }
 }

@@ -30,6 +30,7 @@ pub enum MirrorPacket {
         begin_pos: (usize, usize),
         tile_size: (usize, usize),
         image_size: (usize, usize),
+        samples_per_pixel: usize,
     },
     /// Tile render response packet type, response oof the RenderTileRequest
     /// packet type.

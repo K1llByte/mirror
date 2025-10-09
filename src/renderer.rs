@@ -27,7 +27,6 @@ use crate::{
 
 pub struct Renderer {
     pub peer_table: PeerTable,
-    samples_per_pixel: usize,
     times_sampled: AtomicUsize,
     max_bounces: usize,
 }
@@ -36,23 +35,18 @@ impl Renderer {
     pub fn new(pt: PeerTable) -> Self {
         Self {
             peer_table: pt,
-            samples_per_pixel: 4,
             max_bounces: 10,
             times_sampled: AtomicUsize::new(0),
         }
-    }
-
-    pub fn samples_per_pixel(&self) -> usize {
-        self.samples_per_pixel
     }
 
     pub fn times_sampled(&self) -> usize {
         self.times_sampled.load(atomic::Ordering::Acquire)
     }
 
-    pub fn update_times_sampled(&self) {
+    pub fn update_times_sampled(&self, samples_per_pixel: usize) {
         self.times_sampled
-            .fetch_add(self.samples_per_pixel, atomic::Ordering::Acquire);
+            .fetch_add(samples_per_pixel, atomic::Ordering::Acquire);
     }
 
     pub fn trace(&self, scene: &Scene, ray: &Ray, depth: usize) -> Vec3 {
@@ -75,6 +69,7 @@ impl Renderer {
     pub fn render_tile(
         &self,
         scene: &Scene,
+        samples_per_pixel: usize,
         begin_pos: (usize, usize),
         tile_size: (usize, usize),
         image_size: (usize, usize),
@@ -82,12 +77,12 @@ impl Renderer {
         let mut tile = Tile::new(tile_size);
         let mut rng = SmallRng::from_rng(&mut rand::rng());
 
-        let sample_weight = 1.0 / (self.samples_per_pixel as f32);
+        let sample_weight = 1.0 / (samples_per_pixel as f32);
         for v in 0..tile_size.1 {
             for u in 0..tile_size.0 {
                 let mut pixel_color = Vec3::ZERO;
                 // Ray trace for each sample
-                for _ in 0..self.samples_per_pixel {
+                for _ in 0..samples_per_pixel {
                     let sample_u = (2.0 * (u + begin_pos.0) as f32 / image_size.0 as f32) - 1.0
                         + rng.random_range(0.0..(2.0 / image_size.0 as f32));
                     let sample_v = (2.0 * (v + begin_pos.1) as f32 / image_size.1 as f32) - 1.0
@@ -118,8 +113,9 @@ async fn local_render_tile_task(
     renderer: Arc<Renderer>,
     render_image: Arc<Mutex<Image>>,
     scene: Arc<Scene>,
+    samples_per_pixel: usize,
 ) {
-    let total_samples = renderer.samples_per_pixel() + renderer.times_sampled();
+    let total_samples = samples_per_pixel + renderer.times_sampled();
     let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
     let new_sample_weight = 1.0 / (total_samples as f32);
 
@@ -130,6 +126,7 @@ async fn local_render_tile_task(
             // Do work
             let tile = renderer.render_tile(
                 &scene,
+                samples_per_pixel,
                 tile_render_work.begin_pos,
                 tile_render_work.tile_size,
                 image_size,
@@ -153,8 +150,9 @@ async fn remote_render_tile_task(
     render_image: Arc<Mutex<Image>>,
     scene: Arc<Scene>,
     peer_listen_address: SocketAddr,
+    samples_per_pixel: usize,
 ) {
-    let total_samples = renderer.samples_per_pixel() + renderer.times_sampled();
+    let total_samples = samples_per_pixel + renderer.times_sampled();
     let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
     let new_sample_weight = 1.0 / (total_samples as f32);
 
@@ -190,6 +188,7 @@ async fn remote_render_tile_task(
                     begin_pos: tile_render_work.begin_pos,
                     tile_size: tile_render_work.tile_size,
                     image_size,
+                    samples_per_pixel,
                 })
                 .write(&mut peer.write_socket)
                 .await
@@ -225,6 +224,7 @@ pub async fn render_task(
     renderer: Arc<Renderer>,
     render_image: Arc<Mutex<Image>>,
     scene: Arc<Scene>,
+    samples_per_pixel: usize,
 ) {
     // Measure execution time from here
     let render_time = Instant::now();
@@ -250,6 +250,7 @@ pub async fn render_task(
             renderer.clone(),
             render_image.clone(),
             scene.clone(),
+            samples_per_pixel,
         )));
     }
     // - Remote render_tile tasks: As many as connected peers.
@@ -260,6 +261,7 @@ pub async fn render_task(
             render_image.clone(),
             scene.clone(),
             peer_listen_address,
+            samples_per_pixel,
         )));
     }
 
@@ -293,12 +295,12 @@ pub async fn render_task(
     // Join all work task handles
     future::join_all(join_handles).await;
 
-    renderer.update_times_sampled();
+    renderer.update_times_sampled(samples_per_pixel);
 
     // Log render time
     info!(
         "Rendered {} sample(s) in {} ms",
-        renderer.samples_per_pixel(),
+        samples_per_pixel,
         render_time.elapsed().as_millis()
     );
 }
