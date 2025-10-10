@@ -107,7 +107,7 @@ impl MirrorApp {
         // NOTE: Since Im using try_lock to get peers info to avoid blocking
         // ui task, I use a Vec to cache the info when its not possible to get
         // the lock guard.
-        if let Ok(peer_table_guard) = self.renderer.peer_table.try_lock() {
+        if let Ok(peer_table_guard) = self.renderer.peer_table.try_read() {
             self.cached_peers_info = peer_table_guard
                 .keys()
                 .map(|a| (peer_table_guard.get(a).unwrap().name.clone(), a.to_string()))
@@ -218,9 +218,12 @@ impl eframe::App for MirrorApp {
                         render_join_handle.abort();
                         self.render_join_handle = None;
                     }
-                    self.render_image
-                        .blocking_lock()
-                        .clear(Vec3::new(0.0, 0.0, 0.0));
+                    let clear_value = 20.0 / 255.0;
+                    self.render_image.blocking_lock().clear(Vec3::new(
+                        clear_value,
+                        clear_value,
+                        clear_value,
+                    ));
                     self.present_framebuffer = true;
                 }
             });

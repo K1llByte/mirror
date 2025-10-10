@@ -16,7 +16,7 @@ use glam::Vec3;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::sync::Mutex;
 use tokio::task;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::{
     image::{Image, Tile},
@@ -141,7 +141,7 @@ async fn local_render_tile_task(
     {
         let total_samples = samples_per_pixel + renderer.times_sampled();
         let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
-        let new_sample_weight = 1.0 / (total_samples as f32);
+        let new_sample_weight = (samples_per_pixel as f32) / (total_samples as f32);
         let mut image_guard = render_image.lock().await;
         for (begin_pos, tile) in rendered_tiles {
             image_guard.insert_tile_by(&tile, begin_pos, |c, n| {
@@ -159,13 +159,14 @@ async fn remote_render_tile_task(
     peer_listen_address: SocketAddr,
     samples_per_pixel: usize,
 ) {
+    let mut time_peer_rendering: u128 = 0;
     let mut rendered_tiles = Vec::new();
 
     let image_size = render_image.lock().await.size();
 
     // Synchronize scene before requesting to render tiles
     {
-        let mut peer_table_guard = renderer.peer_table.lock().await;
+        let mut peer_table_guard = renderer.peer_table.write().await;
         let peer = peer_table_guard
             .get_mut(&peer_listen_address)
             .expect("Peer data should exist");
@@ -185,7 +186,7 @@ async fn remote_render_tile_task(
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
             let tile = {
-                let mut peer_table_guard = renderer.peer_table.lock().await;
+                let mut peer_table_guard = renderer.peer_table.write().await;
                 let peer = peer_table_guard
                     .get_mut(&peer_listen_address)
                     .expect("Peer data should exist");
@@ -204,13 +205,16 @@ async fn remote_render_tile_task(
                 }
 
                 // Receive render response
-                match peer.tile_recv_queue.recv().await {
+                let timer = Instant::now();
+                let tile = match peer.tile_recv_queue.recv().await {
                     Ok(tile) => tile,
                     Err(_) => {
                         error!("Unexpected receiver queue error");
                         todo!("Fault tolerance: if fails to send, do something.");
                     }
-                }
+                };
+                time_peer_rendering += timer.elapsed().as_millis();
+                tile
             };
 
             rendered_tiles.push((tile_render_work.begin_pos, tile));
@@ -223,7 +227,7 @@ async fn remote_render_tile_task(
     {
         let total_samples = samples_per_pixel + renderer.times_sampled();
         let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
-        let new_sample_weight = 1.0 / (total_samples as f32);
+        let new_sample_weight = (samples_per_pixel as f32) / (total_samples as f32);
         let mut image_guard = render_image.lock().await;
         for (begin_pos, tile) in rendered_tiles {
             image_guard.insert_tile_by(&tile, begin_pos, |c, n| {
@@ -231,6 +235,11 @@ async fn remote_render_tile_task(
             });
         }
     }
+
+    debug!(
+        "Time peer spent waiting for tile response from remote peer: {} ms",
+        time_peer_rendering
+    );
 }
 
 pub async fn render_task(
@@ -251,7 +260,7 @@ pub async fn render_task(
     let num_local_tasks = thread::available_parallelism()
         .map(NonZero::get)
         .unwrap_or(1);
-    let num_remote_tasks = renderer.peer_table.lock().await.len();
+    let num_remote_tasks = renderer.peer_table.read().await.len();
 
     let mut join_handles = Vec::with_capacity(num_local_tasks + num_remote_tasks);
 
@@ -267,7 +276,7 @@ pub async fn render_task(
         )));
     }
     // - Remote render_tile tasks: As many as connected peers.
-    for peer_listen_address in renderer.peer_table.lock().await.keys().cloned() {
+    for peer_listen_address in renderer.peer_table.read().await.keys().cloned() {
         join_handles.push(tokio::spawn(remote_render_tile_task(
             work_recv_queue.clone(),
             renderer.clone(),

@@ -2,14 +2,16 @@ use std::fmt::Display;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use std::{collections::HashMap, io};
 
 use async_channel::Receiver;
 use core::future::Future;
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tokio::task::{self};
+use tokio::time;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::image::Tile;
@@ -17,7 +19,7 @@ use crate::packet::{MirrorPacket, PacketError};
 use crate::renderer::Renderer;
 use crate::scene::Scene;
 
-pub type PeerTable = Arc<Mutex<HashMap<SocketAddr, Peer>>>;
+pub type PeerTable = Arc<RwLock<HashMap<SocketAddr, Peer>>>;
 
 #[derive(Debug)]
 pub struct Peer {
@@ -56,6 +58,7 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
     listen_port: u16,
     tag: &'static str,
 ) {
+    // TODO: Do the trick of spawning multiple tasks at once and join them immediatelly
     for peer_listen_address in peers {
         let peer_listen_address = peer_listen_address.into();
         // FIXME: Hardcoded 127.0.0.1 for now, will
@@ -72,7 +75,7 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
         // Refuse duplicate connections
         if renderer
             .peer_table
-            .lock()
+            .read()
             .await
             .contains_key(&peer_listen_address)
         {
@@ -84,7 +87,10 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
         }
 
         // Proceed with connection
-        let Ok(socket) = TcpStream::connect(&peer_listen_address).await else {
+        let timeout_duration = Duration::from_secs(1);
+        let Ok(Ok(socket)) =
+            time::timeout(timeout_duration, TcpStream::connect(&peer_listen_address)).await
+        else {
             warn!(
                 "[{tag}, {:?}] - Could not connect to peer '{peer_listen_address}'",
                 task::try_id(),
@@ -133,7 +139,7 @@ pub fn peer_task(
 
         let (tile_send_queue, tile_recv_queue) = async_channel::unbounded();
         {
-            let mut peer_table_guard = renderer.peer_table.lock().await;
+            let mut peer_table_guard = renderer.peer_table.write().await;
             // Refuse self connections
             if peer_listen_address == local_listen_address {
                 info!(
@@ -167,14 +173,14 @@ pub fn peer_task(
                 .filter(|&pa| *pa != peer_listen_address)
                 .cloned()
                 .collect();
-            debug!(
-                "[{tag}, {}] - PeerTable connections: {:?}",
-                task::id(),
-                peer_table_guard
-                    .iter()
-                    .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
-                    .collect::<Vec<_>>()
-            );
+            // debug!(
+            //     "[{tag}, {}] - PeerTable connections: {:?}",
+            //     task::id(),
+            //     peer_table_guard
+            //         .iter()
+            //         .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
+            //         .collect::<Vec<_>>()
+            // );
             let peer = peer_table_guard
                 .get_mut(&peer_listen_address)
                 .expect("Unexpected, this entry was just inserted");
@@ -205,17 +211,17 @@ pub fn peer_task(
                         new_peers
                     );
                     connect_to_peers(new_peers, renderer.clone(), listen_port, "Gossip").await;
-                    debug!(
-                        "[{tag}, {}] PeerTable connections: {:?}",
-                        task::id(),
-                        renderer
-                            .peer_table
-                            .lock()
-                            .await
-                            .iter()
-                            .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
-                            .collect::<Vec<_>>()
-                    );
+                    // debug!(
+                    //     "[{tag}, {}] PeerTable connections: {:?}",
+                    //     task::id(),
+                    //     renderer
+                    //         .peer_table
+                    //         .read()
+                    //         .await
+                    //         .iter()
+                    //         .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
+                    //         .collect::<Vec<_>>()
+                    // );
                 }
                 Ok(MirrorPacket::SyncScene(received_scene)) => {
                     debug!(
@@ -232,6 +238,7 @@ pub fn peer_task(
                     image_size,
                     samples_per_pixel,
                 }) => {
+                    let timer = Instant::now();
                     debug!("[{tag}, {}] Received render tile request", task::id());
                     if scene.is_none() {
                         warn!(
@@ -247,7 +254,8 @@ pub fn peer_task(
                         tile_size,
                         image_size,
                     );
-                    let mut peer_table_guard = renderer.peer_table.lock().await;
+
+                    let mut peer_table_guard = renderer.peer_table.write().await;
                     let peer = peer_table_guard
                         .get_mut(&peer_listen_address)
                         .expect("Should be available while this tasks runs");
@@ -257,6 +265,10 @@ pub fn peer_task(
                     {
                         error!("[{tag}, {}] Error: {:?}", task::id(), err);
                     }
+                    debug!(
+                        "Time spent rendering for another peer: {} ms",
+                        timer.elapsed().as_millis()
+                    );
                 }
                 Ok(MirrorPacket::RenderTileResponse(tile)) => {
                     debug!("[{tag}, {}] Received render tile response", task::id());
@@ -281,7 +293,7 @@ pub fn peer_task(
 
         renderer
             .peer_table
-            .lock()
+            .write()
             .await
             .remove(&peer_listen_address);
         info!(
@@ -290,16 +302,16 @@ pub fn peer_task(
             peer_address
         );
 
-        debug!(
-            "[{tag}, {}] PeerTable connections: {:?}",
-            task::id(),
-            renderer
-                .peer_table
-                .lock()
-                .await
-                .iter()
-                .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
-                .collect::<Vec<_>>()
-        );
+        // debug!(
+        //     "[{tag}, {}] PeerTable connections: {:?}",
+        //     task::id(),
+        //     renderer
+        //         .peer_table
+        //         .read()
+        //         .await
+        //         .iter()
+        //         .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
+        //         .collect::<Vec<_>>()
+        // );
     }
 }

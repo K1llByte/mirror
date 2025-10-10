@@ -1,6 +1,5 @@
 use bincode::{Decode, Encode};
 use glam::Vec3;
-use rand::thread_rng;
 
 use crate::{ray::Ray, scene::Hit, utils};
 

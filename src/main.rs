@@ -7,7 +7,7 @@ use std::thread;
 use chrono::Local;
 use clap::Parser;
 use glam::Vec3;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tracing::info;
 use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
@@ -80,15 +80,15 @@ fn create_scene(image_size: (usize, usize)) -> Scene {
     });
     let right_mat = Arc::new(Material::Metalic {
         albedo: Vec3::new(0.8, 0.6, 0.2),
-        fuzzyness: 1.5,
+        fuzzyness: 0.0,
     });
 
     // Scene
     Scene {
         // camera: Camera::new(Vec3::ZERO, image_size.0 as f32, image_size.1 as f32),
         camera: Camera::new(
-            Vec3::ZERO,
-            Vec3::new(0.0, 0.0, -1.0).normalize(),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, -1.0, -1.0).normalize(),
             Vec3::new(0.0, -1.0, 0.0).normalize(),
             100.0,
             image_size.0 as f32 / image_size.1 as f32,
@@ -124,6 +124,7 @@ fn main() -> anyhow::Result<()> {
                 .unwrap_or(4),
         )
         .enable_io()
+        .enable_time()
         .build()
         .unwrap();
 
@@ -148,7 +149,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let peer_table = Arc::new(Mutex::new(HashMap::<SocketAddr, Peer>::new()));
+    let peer_table = Arc::new(RwLock::new(HashMap::<SocketAddr, Peer>::new()));
     let renderer = Arc::new(Renderer::new(peer_table.clone()));
     let scene = Arc::new(create_scene((1280, 720)));
 
