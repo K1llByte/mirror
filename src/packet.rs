@@ -69,6 +69,7 @@ impl MirrorPacket {
         let len_bytes = (serialized.len() as u32).to_be_bytes();
         stream.write_all(&len_bytes).await?;
         stream.write_all(&serialized).await?;
+        stream.flush().await?;
 
         Ok(())
     }

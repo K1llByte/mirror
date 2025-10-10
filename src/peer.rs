@@ -231,7 +231,6 @@ pub fn peer_task(
                     );
                     scene = Some(received_scene);
                 }
-
                 Ok(MirrorPacket::RenderTileRequest {
                     begin_pos,
                     tile_size,

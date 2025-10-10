@@ -1,5 +1,5 @@
 use std::{
-    cmp::min,
+    cmp::{max, min},
     net::SocketAddr,
     num::NonZero,
     sync::{
@@ -14,9 +14,8 @@ use async_channel::Receiver;
 use futures::future;
 use glam::Vec3;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
-use tokio::sync::Mutex;
-use tokio::task;
-use tracing::{debug, error, info};
+use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
 
 use crate::{
     image::{Image, Tile},
@@ -112,14 +111,14 @@ struct TileRenderWork {
 async fn local_render_tile_task(
     work_recv_queue: Receiver<TileRenderWork>,
     renderer: Arc<Renderer>,
-    render_image: Arc<Mutex<Image>>,
+    render_image: Arc<RwLock<Image>>,
     scene: Arc<Scene>,
     samples_per_pixel: usize,
 ) {
     let mut rendered_tiles = Vec::new();
 
     // Do render work until theres no more
-    let image_size = render_image.lock().await.size();
+    let image_size = render_image.read().await.size();
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
@@ -142,7 +141,7 @@ async fn local_render_tile_task(
         let total_samples = samples_per_pixel + renderer.times_sampled();
         let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
         let new_sample_weight = (samples_per_pixel as f32) / (total_samples as f32);
-        let mut image_guard = render_image.lock().await;
+        let mut image_guard = render_image.write().await;
         for (begin_pos, tile) in rendered_tiles {
             image_guard.insert_tile_by(&tile, begin_pos, |c, n| {
                 c * sampled_weight + n * new_sample_weight
@@ -154,7 +153,7 @@ async fn local_render_tile_task(
 async fn remote_render_tile_task(
     work_recv_queue: Receiver<TileRenderWork>,
     renderer: Arc<Renderer>,
-    render_image: Arc<Mutex<Image>>,
+    render_image: Arc<RwLock<Image>>,
     scene: Arc<Scene>,
     peer_listen_address: SocketAddr,
     samples_per_pixel: usize,
@@ -162,7 +161,7 @@ async fn remote_render_tile_task(
     let mut time_peer_rendering: u128 = 0;
     let mut rendered_tiles = Vec::new();
 
-    let image_size = render_image.lock().await.size();
+    let image_size = render_image.read().await.size();
 
     // Synchronize scene before requesting to render tiles
     {
@@ -171,48 +170,54 @@ async fn remote_render_tile_task(
             .get_mut(&peer_listen_address)
             .expect("Peer data should exist");
         // FIXME: We shouldn't need to clone when we want to send the scene.
-        if let Err(_) = (MirrorPacket::SyncScene((*scene).clone()))
+        if let Err(err) = (MirrorPacket::SyncScene((*scene).clone()))
             .write(&mut peer.write_socket)
             .await
         {
+            debug!("{err:?}");
             error!("Remote work task failed to send render tile work");
             todo!("Fault tolerance: if fails to send, do something.");
         }
     }
 
-    // Do render work until theres no more
+    // Do render work until there's no more
     loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
             let tile = {
-                let mut peer_table_guard = renderer.peer_table.write().await;
-                let peer = peer_table_guard
-                    .get_mut(&peer_listen_address)
-                    .expect("Peer data should exist");
-                // Send render request
-                if let Err(_) = (MirrorPacket::RenderTileRequest {
-                    begin_pos: tile_render_work.begin_pos,
-                    tile_size: tile_render_work.tile_size,
-                    image_size,
-                    samples_per_pixel,
-                })
-                .write(&mut peer.write_socket)
-                .await
-                {
-                    error!("Remote work task failed to send render tile work");
-                    todo!("Fault tolerance: if fails to send, do something.");
-                }
+                let tile_recv_queue = {
+                    let mut peer_table_guard = renderer.peer_table.write().await;
+                    let peer = peer_table_guard
+                        .get_mut(&peer_listen_address)
+                        .expect("Peer data should exist");
+                    // Send render request
+                    if let Err(_) = (MirrorPacket::RenderTileRequest {
+                        begin_pos: tile_render_work.begin_pos,
+                        tile_size: tile_render_work.tile_size,
+                        image_size,
+                        samples_per_pixel,
+                    })
+                    .write(&mut peer.write_socket)
+                    .await
+                    {
+                        error!("Remote work task failed to send render tile work");
+                        todo!("Fault tolerance: if fails to send, do something.");
+                    }
+                    peer.tile_recv_queue.clone()
+                };
 
                 // Receive render response
                 let timer = Instant::now();
-                let tile = match peer.tile_recv_queue.recv().await {
+                warn!("BEFORE READING FROM RECV QUEUE");
+                let tile = match tile_recv_queue.recv().await {
                     Ok(tile) => tile,
                     Err(_) => {
                         error!("Unexpected receiver queue error");
                         todo!("Fault tolerance: if fails to send, do something.");
                     }
                 };
+                warn!("AFTER READING FROM RECV QUEUE");
                 time_peer_rendering += timer.elapsed().as_millis();
                 tile
             };
@@ -228,7 +233,7 @@ async fn remote_render_tile_task(
         let total_samples = samples_per_pixel + renderer.times_sampled();
         let sampled_weight = renderer.times_sampled() as f32 / total_samples as f32;
         let new_sample_weight = (samples_per_pixel as f32) / (total_samples as f32);
-        let mut image_guard = render_image.lock().await;
+        let mut image_guard = render_image.write().await;
         for (begin_pos, tile) in rendered_tiles {
             image_guard.insert_tile_by(&tile, begin_pos, |c, n| {
                 c * sampled_weight + n * new_sample_weight
@@ -244,7 +249,7 @@ async fn remote_render_tile_task(
 
 pub async fn render_task(
     renderer: Arc<Renderer>,
-    render_image: Arc<Mutex<Image>>,
+    render_image: Arc<RwLock<Image>>,
     scene: Arc<Scene>,
     samples_per_pixel: usize,
 ) {
@@ -252,15 +257,22 @@ pub async fn render_task(
     let render_time = Instant::now();
 
     const RENDER_TILE_MAX_SIZE: (usize, usize) = (64, 64);
-    let image_size = render_image.lock().await.size();
+    let image_size = render_image.read().await.size();
     assert!(image_size.0 >= RENDER_TILE_MAX_SIZE.0 && image_size.1 >= RENDER_TILE_MAX_SIZE.1);
 
     let (work_send_queue, work_recv_queue) = async_channel::unbounded::<TileRenderWork>();
 
-    let num_local_tasks = thread::available_parallelism()
+    // let num_local_tasks = thread::available_parallelism()
+    //     .map(NonZero::get)
+    //     .unwrap_or(1);
+    let num_remote_tasks = renderer.peer_table.read().await.len();
+    let num_processors = thread::available_parallelism()
         .map(NonZero::get)
         .unwrap_or(1);
-    let num_remote_tasks = renderer.peer_table.read().await.len();
+    let num_local_tasks = max(
+        num_processors - min(num_remote_tasks, num_processors / 2),
+        1,
+    );
 
     let mut join_handles = Vec::with_capacity(num_local_tasks + num_remote_tasks);
 

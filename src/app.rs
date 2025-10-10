@@ -6,7 +6,7 @@ use std::{
 use eframe::egui::{self, ColorImage, DragValue, Key, TextureHandle, Ui, load::Bytes};
 use egui_extras::{Column, TableBuilder};
 use glam::Vec3;
-use tokio::{runtime::Runtime, sync::Mutex, task::JoinHandle};
+use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
 
 use crate::{
     image::Image,
@@ -18,7 +18,7 @@ pub struct MirrorApp {
     // Backend data
     runtime: Runtime,
     renderer: Arc<Renderer>,
-    render_image: Arc<Mutex<Image>>,
+    render_image: Arc<RwLock<Image>>,
     scene: Arc<Scene>,
 
     // Ui data
@@ -39,7 +39,7 @@ impl MirrorApp {
             // Backend data
             runtime,
             renderer,
-            render_image: Arc::new(Mutex::new(Image::new(framebuffer_size))),
+            render_image: Arc::new(RwLock::new(Image::new(framebuffer_size))),
             scene,
             // Ui data
             present_framebuffer: false,
@@ -71,9 +71,13 @@ impl MirrorApp {
             .is_some_and(|fut| fut.is_finished())
             || self.present_framebuffer
         {
-            let image_size: [usize; 2] = self.render_image.blocking_lock().size().into();
-            let image_bytes =
-                Bytes::Shared(Arc::from(self.render_image.blocking_lock().to_bytes()));
+            let (image_size, image_bytes): ([usize; 2], _) = {
+                let render_image_guard = self.render_image.blocking_read();
+                (
+                    render_image_guard.size().into(),
+                    Bytes::Shared(Arc::from(render_image_guard.to_bytes())),
+                )
+            };
             let image_data = ColorImage::from_rgb(image_size, image_bytes.as_ref());
             self.texture.replace(ui.ctx().load_texture(
                 "render_image",
@@ -180,7 +184,7 @@ impl eframe::App for MirrorApp {
                         let fb_height_drag = ui.add(DragValue::new(&mut self.framebuffer_size.1));
                         if fb_width_drag.changed() || fb_height_drag.changed() {
                             self.render_image
-                                .blocking_lock()
+                                .blocking_write()
                                 .resize(self.framebuffer_size);
                         }
                     });
@@ -219,7 +223,7 @@ impl eframe::App for MirrorApp {
                         self.render_join_handle = None;
                     }
                     let clear_value = 20.0 / 255.0;
-                    self.render_image.blocking_lock().clear(Vec3::new(
+                    self.render_image.blocking_write().clear(Vec3::new(
                         clear_value,
                         clear_value,
                         clear_value,
