@@ -87,7 +87,7 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
         }
 
         // Proceed with connection
-        let timeout_duration = Duration::from_secs(1);
+        let timeout_duration = Duration::from_secs(5);
         let Ok(Ok(socket)) =
             time::timeout(timeout_duration, TcpStream::connect(&peer_listen_address)).await
         else {

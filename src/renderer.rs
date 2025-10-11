@@ -100,7 +100,9 @@ struct TileRenderWork {
 }
 
 async fn local_render_tile_task(
+    work_send_queue: Sender<TileRenderWork>,
     work_recv_queue: Receiver<TileRenderWork>,
+    remaining_tiles: Arc<AtomicUsize>,
     renderer: Arc<Renderer>,
     render_image: Arc<RwLock<AccumulatedImage>>,
     scene: Arc<Scene>,
@@ -125,6 +127,12 @@ async fn local_render_tile_task(
                 image_size,
             );
             rendered_tiles.push((tile_render_work.begin_pos, tile));
+            // Decrement number of remainder tiles to be rendered and close
+            // shared send queue to signal other tasks to end work.
+            remaining_tiles.fetch_sub(1, atomic::Ordering::Relaxed);
+            if remaining_tiles.load(atomic::Ordering::Relaxed) == 0 {
+                work_send_queue.close();
+            }
         } else {
             break;
         }
@@ -147,6 +155,7 @@ async fn local_render_tile_task(
 async fn remote_render_tile_task(
     work_send_queue: Sender<TileRenderWork>,
     work_recv_queue: Receiver<TileRenderWork>,
+    remaining_tiles: Arc<AtomicUsize>,
     renderer: Arc<Renderer>,
     render_image: Arc<RwLock<AccumulatedImage>>,
     scene: Arc<Scene>,
@@ -212,7 +221,6 @@ async fn remote_render_tile_task(
                     Err(_) => {
                         error!("Unexpected receiver queue error");
                         work_send_queue.send(tile_render_work).await.unwrap();
-                        info!("Sent tile render work!");
                         return;
                     }
                 };
@@ -221,6 +229,12 @@ async fn remote_render_tile_task(
             };
 
             rendered_tiles.push((tile_render_work.begin_pos, tile));
+
+            // Decrement number of remainder tiles to be rendered and close
+            // channel so other tasks can finish and join.
+            if remaining_tiles.fetch_sub(1, atomic::Ordering::Relaxed) == 0 {
+                work_send_queue.close();
+            }
         } else {
             break;
         }
@@ -258,6 +272,12 @@ pub async fn render_task(
     let image_size = render_image.read().await.size();
     assert!(image_size.0 >= RENDER_TILE_MAX_SIZE.0 && image_size.1 >= RENDER_TILE_MAX_SIZE.1);
 
+    let num_width_tiles = image_size.0 / RENDER_TILE_MAX_SIZE.0
+        + (image_size.0 % RENDER_TILE_MAX_SIZE.0 != 0) as usize;
+    let num_height_tiles = image_size.1 / RENDER_TILE_MAX_SIZE.1
+        + (image_size.1 % RENDER_TILE_MAX_SIZE.1 != 0) as usize;
+    let remaining_tiles = Arc::new(AtomicUsize::new(num_height_tiles * num_width_tiles));
+
     let (work_send_queue, work_recv_queue) = async_channel::unbounded::<TileRenderWork>();
 
     // let num_local_tasks = thread::available_parallelism()
@@ -278,7 +298,9 @@ pub async fn render_task(
     // - Local render_tile tasks: An amount of CPU cores.
     for _ in 0..num_local_tasks {
         join_handles.push(tokio::spawn(local_render_tile_task(
+            work_send_queue.clone(),
             work_recv_queue.clone(),
+            remaining_tiles.clone(),
             renderer.clone(),
             render_image.clone(),
             scene.clone(),
@@ -290,6 +312,7 @@ pub async fn render_task(
         join_handles.push(tokio::spawn(remote_render_tile_task(
             work_send_queue.clone(),
             work_recv_queue.clone(),
+            remaining_tiles.clone(),
             renderer.clone(),
             render_image.clone(),
             scene.clone(),
@@ -301,10 +324,6 @@ pub async fn render_task(
     // Loop over all tiles splitted to be rendered. This loop takes into
     // account the last remainder tiles that could not be of size
     // RENDER_TILE_MAX_SIZE.
-    let num_width_tiles = image_size.0 / RENDER_TILE_MAX_SIZE.0
-        + (image_size.0 % RENDER_TILE_MAX_SIZE.0 != 0) as usize;
-    let num_height_tiles = image_size.1 / RENDER_TILE_MAX_SIZE.1
-        + (image_size.1 % RENDER_TILE_MAX_SIZE.1 != 0) as usize;
     for ty in 0..num_height_tiles {
         let begin_height = ty * RENDER_TILE_MAX_SIZE.1;
         let tile_height = min(RENDER_TILE_MAX_SIZE.1, image_size.1 - begin_height);
@@ -322,8 +341,6 @@ pub async fn render_task(
                 .unwrap();
         }
     }
-    // Close channel so that tasks can finish and join
-    work_send_queue.close();
 
     // Join all work task handles
     future::join_all(join_handles).await;
