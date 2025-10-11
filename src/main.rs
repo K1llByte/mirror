@@ -18,6 +18,7 @@ use crate::peer::{Peer, listen_task};
 use crate::renderer::Renderer;
 use crate::scene::{Model, Scene, Sphere};
 
+mod accum_image;
 mod app;
 mod camera;
 mod config;

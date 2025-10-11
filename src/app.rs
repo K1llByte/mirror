@@ -9,6 +9,7 @@ use glam::Vec3;
 use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
 
 use crate::{
+    accum_image::AccumulatedImage,
     image::Image,
     renderer::{self, Renderer},
     scene::Scene,
@@ -18,7 +19,7 @@ pub struct MirrorApp {
     // Backend data
     runtime: Runtime,
     renderer: Arc<Renderer>,
-    render_image: Arc<RwLock<Image>>,
+    render_image: Arc<RwLock<AccumulatedImage>>,
     scene: Arc<Scene>,
 
     // Ui data
@@ -39,7 +40,7 @@ impl MirrorApp {
             // Backend data
             runtime,
             renderer,
-            render_image: Arc::new(RwLock::new(Image::new(framebuffer_size))),
+            render_image: Arc::new(RwLock::new(AccumulatedImage::new(framebuffer_size))),
             scene,
             // Ui data
             present_framebuffer: false,
