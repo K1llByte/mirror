@@ -173,14 +173,6 @@ pub fn peer_task(
                 .filter(|&pa| *pa != peer_listen_address)
                 .cloned()
                 .collect();
-            // debug!(
-            //     "[{tag}, {}] - PeerTable connections: {:?}",
-            //     task::id(),
-            //     peer_table_guard
-            //         .iter()
-            //         .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
-            //         .collect::<Vec<_>>()
-            // );
             let peer = peer_table_guard
                 .get_mut(&peer_listen_address)
                 .expect("Unexpected, this entry was just inserted");
@@ -211,17 +203,6 @@ pub fn peer_task(
                         new_peers
                     );
                     connect_to_peers(new_peers, renderer.clone(), listen_port, "Gossip").await;
-                    // debug!(
-                    //     "[{tag}, {}] PeerTable connections: {:?}",
-                    //     task::id(),
-                    //     renderer
-                    //         .peer_table
-                    //         .read()
-                    //         .await
-                    //         .iter()
-                    //         .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
-                    //         .collect::<Vec<_>>()
-                    // );
                 }
                 Ok(MirrorPacket::SyncScene(received_scene)) => {
                     debug!(
@@ -264,7 +245,7 @@ pub fn peer_task(
                     {
                         error!("[{tag}, {}] Error: {:?}", task::id(), err);
                     }
-                    debug!(
+                    trace!(
                         "Time spent rendering for another peer: {} ms",
                         timer.elapsed().as_millis()
                     );
@@ -300,17 +281,5 @@ pub fn peer_task(
             task::id(),
             peer_address
         );
-
-        // debug!(
-        //     "[{tag}, {}] PeerTable connections: {:?}",
-        //     task::id(),
-        //     renderer
-        //         .peer_table
-        //         .read()
-        //         .await
-        //         .iter()
-        //         .map(|(k, v)| (v.write_socket.peer_addr().unwrap().port(), k.port()))
-        //         .collect::<Vec<_>>()
-        // );
     }
 }

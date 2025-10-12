@@ -16,7 +16,7 @@ use futures::future;
 use glam::Vec3;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     accum_image::AccumulatedImage,
