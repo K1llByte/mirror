@@ -3,7 +3,9 @@ use std::{
     time::Duration,
 };
 
-use eframe::egui::{self, ColorImage, DragValue, Key, TextureHandle, Ui, load::Bytes};
+use eframe::egui::{
+    self, Color32, ColorImage, DragValue, Key, RichText, TextureHandle, Ui, load::Bytes,
+};
 use egui_extras::{Column, TableBuilder};
 use glam::Vec3;
 use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
@@ -211,6 +213,14 @@ impl eframe::App for MirrorApp {
                         }),
                     )
                 });
+
+                // let stop_button = ui.add_enabled(is_rendering, |ui: &mut Ui| {
+                //     ui.add_sized(
+                //         [ui.available_width(), 30.0],
+                //         egui::Button::new("Stop").fill(Color32::from_rgb(100, 40, 40)),
+                //     )
+                // });
+
                 if render_button.clicked() {
                     self.spawn_render_task();
                 }

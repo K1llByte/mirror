@@ -88,10 +88,10 @@ fn create_scene(image_size: (usize, usize)) -> Scene {
     Scene {
         // camera: Camera::new(Vec3::ZERO, image_size.0 as f32, image_size.1 as f32),
         camera: Camera::new(
-            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 6.0, 5.0),
             Vec3::new(0.0, -1.0, -1.0).normalize(),
             Vec3::new(0.0, -1.0, 0.0).normalize(),
-            100.0,
+            30.0,
             image_size.0 as f32 / image_size.1 as f32,
         ),
         objects: vec![
@@ -134,7 +134,7 @@ fn main() -> anyhow::Result<()> {
 
     // Initialize logger.
     tracing_subscriber::fmt()
-        .with_env_filter("mirror=debug")
+        .with_env_filter("mirror=trace")
         .with_timer(CustomTime)
         .init();
 

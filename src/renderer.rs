@@ -192,6 +192,7 @@ async fn remote_render_tile_task(
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
             let tile = {
+                let timer = Instant::now();
                 let tile_recv_queue = {
                     let mut peer_table_guard = renderer.peer_table.write().await;
                     let peer = peer_table_guard
@@ -215,7 +216,6 @@ async fn remote_render_tile_task(
                 };
 
                 // Receive render response
-                let timer = Instant::now();
                 let tile = match tile_recv_queue.recv().await {
                     Ok(tile) => tile,
                     Err(_) => {
@@ -253,8 +253,8 @@ async fn remote_render_tile_task(
         }
     }
 
-    debug!(
-        "Time peer spent waiting for tile response from remote peer: {} ms",
+    trace!(
+        "Time remoote peer spent rendering + latency: {} ms",
         time_peer_rendering
     );
 }
