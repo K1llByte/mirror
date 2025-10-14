@@ -6,17 +6,14 @@ use std::thread;
 
 use chrono::Local;
 use clap::Parser;
-use glam::Vec3;
 use tokio::sync::RwLock;
 use tracing::info;
 use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
-use crate::camera::Camera;
 use crate::config::Config;
-use crate::material::Material;
 use crate::peer::{Peer, listen_task};
 use crate::renderer::Renderer;
-use crate::scene::{Model, Scene, Sphere};
+use crate::test_scenes::*;
 
 mod accum_image;
 mod app;
@@ -29,6 +26,7 @@ mod peer;
 mod ray;
 mod renderer;
 mod scene;
+mod test_scenes;
 mod utils;
 
 #[derive(Parser)]
@@ -47,71 +45,6 @@ impl FormatTime for CustomTime {
     fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
         write!(w, "[{}]", Local::now().format("%H:%M:%S"))
         // write!(w, "[{}]", Local::now().format("%d/%m/%y %H:%M:%S"))
-    }
-}
-
-fn create_scene(image_size: (usize, usize)) -> Scene {
-    // Spheres
-    let sphere_left = Sphere {
-        position: Vec3::new(-1.0, 0.0, -1.0),
-        radius: 0.5,
-    };
-    let sphere_center = Sphere {
-        position: Vec3::new(0.0, 0.0, -1.0),
-        radius: 0.5,
-    };
-    let sphere_right = Sphere {
-        position: Vec3::new(1.0, 0.0, -1.0),
-        radius: 0.5,
-    };
-    let sphere_ground = Sphere {
-        position: Vec3::new(0.0, -100.5, -1.0),
-        radius: 100.0,
-    };
-
-    // Materials
-    let ground_mat = Arc::new(Material::Diffuse {
-        albedo: Vec3::new(0.8, 0.8, 0.0),
-    });
-    let center_mat = Arc::new(Material::Diffuse {
-        albedo: Vec3::new(0.1, 0.2, 0.5),
-    });
-    let left_mat = Arc::new(Material::Dielectric {
-        refraction_index: 1.5,
-    });
-    let right_mat = Arc::new(Material::Metalic {
-        albedo: Vec3::new(0.8, 0.6, 0.2),
-        fuzzyness: 0.0,
-    });
-
-    // Scene
-    Scene {
-        // camera: Camera::new(Vec3::ZERO, image_size.0 as f32, image_size.1 as f32),
-        camera: Camera::new(
-            Vec3::new(0.0, 6.0, 5.0),
-            Vec3::new(0.0, -1.0, -1.0).normalize(),
-            Vec3::new(0.0, -1.0, 0.0).normalize(),
-            30.0,
-            image_size.0 as f32 / image_size.1 as f32,
-        ),
-        objects: vec![
-            Model {
-                geometry: sphere_left,
-                material: left_mat.clone(), // center_mat.clone(),
-            },
-            Model {
-                geometry: sphere_center,
-                material: center_mat.clone(),
-            },
-            Model {
-                geometry: sphere_right,
-                material: right_mat.clone(),
-            },
-            Model {
-                geometry: sphere_ground,
-                material: ground_mat.clone(),
-            },
-        ],
     }
 }
 
@@ -152,7 +85,7 @@ fn main() -> anyhow::Result<()> {
 
     let peer_table = Arc::new(RwLock::new(HashMap::<SocketAddr, Peer>::new()));
     let renderer = Arc::new(Renderer::new(peer_table.clone()));
-    let scene = Arc::new(create_scene((1280, 720)));
+    let scene = Arc::new(spheres2_scene(16.0 / 9.0));
 
     let listen_task_future = runtime.spawn(listen_task(
         renderer.clone(),
