@@ -1,10 +1,9 @@
-use std::cmp::min;
-
 use bincode::{Decode, Encode};
 use glam::Vec3;
 use rand::Rng;
 
-use crate::{ray::Ray, scene::Hit, utils};
+use crate::raytracer::{Hit, Ray};
+use crate::utils;
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub enum Material {
@@ -38,15 +37,15 @@ impl Material {
                 // TODO: Check if direction is not near 0
 
                 Some(ScatteredRay {
-                    ray: Ray::new(hit.position, direction),
+                    ray: Ray::new(hit.position, direction.normalize()),
                     attenuation: *albedo,
                 })
             }
             Self::Metalic { albedo, fuzzyness } => {
-                let reflected_dir = utils::reflect(ray.direction(), hit.normal).normalize();
+                let reflected_dir = ray.direction().reflect(hit.normal).normalize();
                 let scattered_ray = Ray::new(
                     hit.position,
-                    reflected_dir + *fuzzyness * utils::random_vector(&mut rng),
+                    (reflected_dir + *fuzzyness * utils::random_vector(&mut rng)).normalize(),
                 );
                 if scattered_ray.direction().dot(hit.normal) > 0.0 {
                     Some(ScatteredRay {
@@ -80,13 +79,13 @@ impl Material {
                     || schlick_approximation(cos_theta, real_refraction_index)
                         > rng.random_range(0f32..1f32)
                 {
-                    utils::reflect(unit_ray_dir, hit.normal)
+                    unit_ray_dir.reflect(hit.normal)
                 } else {
-                    utils::refract(unit_ray_dir, hit.normal, real_refraction_index)
+                    unit_ray_dir.refract(hit.normal, real_refraction_index)
                 };
 
                 Some(ScatteredRay {
-                    ray: Ray::new(hit.position, ray_direction),
+                    ray: Ray::new(hit.position, ray_direction.normalize()),
                     attenuation,
                 })
             }

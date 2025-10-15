@@ -1,7 +1,7 @@
 use bincode::{Decode, Encode};
 use glam::Vec3;
 
-use crate::ray::Ray;
+use crate::raytracer::Ray;
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct Camera {

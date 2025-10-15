@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bincode::{Decode, Encode};
 use glam::Vec3;
 
-use crate::{camera::Camera, material::Material, ray::Ray};
+use crate::raytracer::{Camera, Material, Ray};
 
 pub struct Hit {
     pub distance: f32,

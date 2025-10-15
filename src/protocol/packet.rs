@@ -6,8 +6,8 @@ use bincode::{Decode, Encode, config, decode_from_slice};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::image::Image;
-use crate::scene::Scene;
+use crate::raytracer::Image;
+use crate::raytracer::Scene;
 
 /// Represents the main control packet used in the peer-to-peer network.
 #[derive(Debug, Encode, Decode)]

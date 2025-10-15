@@ -6,28 +6,17 @@ use std::thread;
 
 use chrono::Local;
 use clap::Parser;
+use mirror::editor;
 use tokio::sync::RwLock;
 use tracing::info;
 use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
-use crate::config::Config;
-use crate::peer::{Peer, listen_task};
-use crate::renderer::Renderer;
 use crate::test_scenes::*;
+use mirror::config::Config;
+use mirror::protocol::{Peer, listen_task};
+use mirror::raytracer::Renderer;
 
-mod accum_image;
-mod app;
-mod camera;
-mod config;
-mod image;
-mod material;
-mod packet;
-mod peer;
-mod ray;
-mod renderer;
-mod scene;
 mod test_scenes;
-mod utils;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -99,7 +88,7 @@ fn main() -> anyhow::Result<()> {
             "Mirror App",
             options,
             Box::new(|_| {
-                Ok(Box::new(app::MirrorApp::new(
+                Ok(Box::new(editor::MirrorApp::new(
                     runtime,
                     renderer.clone(),
                     scene,

@@ -7,6 +7,10 @@ pub struct Ray {
 
 impl Ray {
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
+        assert!(
+            direction.is_normalized(),
+            "Ray direction must be normalized"
+        );
         Self { origin, direction }
     }
 

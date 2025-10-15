@@ -4,11 +4,7 @@ use std::sync::Arc;
 use glam::Vec3;
 use rand::Rng;
 
-use crate::{
-    camera::Camera,
-    material::Material,
-    scene::{Model, Scene, Sphere},
-};
+use mirror::raytracer::{Camera, Material, Model, Scene, Sphere};
 
 pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
     // Spheres

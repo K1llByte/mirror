@@ -14,10 +14,8 @@ use tokio::task::{self};
 use tokio::time;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::image::Tile;
-use crate::packet::{MirrorPacket, PacketError};
-use crate::renderer::Renderer;
-use crate::scene::Scene;
+use crate::protocol::{MirrorPacket, PacketError};
+use crate::raytracer::{Renderer, Scene, Tile};
 
 pub type PeerTable = Arc<RwLock<HashMap<SocketAddr, Peer>>>;
 

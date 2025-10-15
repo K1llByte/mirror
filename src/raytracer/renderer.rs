@@ -2,7 +2,6 @@ use std::{
     cmp::{max, min},
     net::SocketAddr,
     num::NonZero,
-    ops::{Deref, DerefMut},
     sync::{
         Arc,
         atomic::{self, AtomicUsize},
@@ -18,14 +17,8 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{
-    accum_image::AccumulatedImage,
-    image::Tile,
-    packet::MirrorPacket,
-    peer::PeerTable,
-    ray::Ray,
-    scene::{Hittable, Scene},
-};
+use crate::protocol::{MirrorPacket, PeerTable};
+use crate::raytracer::{AccumulatedImage, Hittable, Ray, Scene, Tile};
 
 pub struct Renderer {
     pub peer_table: PeerTable,

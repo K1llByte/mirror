@@ -1,19 +1,6 @@
 use glam::Vec3;
 use rand::Rng;
 
-/// Reflect vector
-pub fn reflect(v: Vec3, n: Vec3) -> Vec3 {
-    v - 2.0 * v.dot(n) * n
-}
-
-/// Refract vector
-pub fn refract(v: Vec3, n: Vec3, factor: f32) -> Vec3 {
-    let cos_theta = (-v).dot(n).min(1.0);
-    let r_out_perp = factor * (v + cos_theta * n);
-    let r_out_parallel = (-((1.0 - r_out_perp.length_squared()).abs().sqrt())) * n;
-    r_out_perp + r_out_parallel
-}
-
 /// Convert cartesian into spherical coordinates
 pub fn cartesian_to_spherical(v: Vec3) -> Vec3 {
     let radius = (v.x * v.x + v.y * v.y + v.z * v.z).sqrt();

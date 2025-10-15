@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::image::Image;
+use crate::raytracer::Image;
 
 /// Specialized image type where each image pixel represents an average of all
 /// accumulated luminance values. The amount of times sampled is stored to

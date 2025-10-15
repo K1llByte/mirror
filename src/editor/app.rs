@@ -1,21 +1,11 @@
-use std::{
-    sync::{Arc, atomic::AtomicUsize},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
-use eframe::egui::{
-    self, Color32, ColorImage, DragValue, Key, RichText, TextureHandle, Ui, load::Bytes,
-};
+use eframe::egui::{self, ColorImage, DragValue, Key, TextureHandle, Ui, load::Bytes};
 use egui_extras::{Column, TableBuilder};
 use glam::Vec3;
 use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
 
-use crate::{
-    accum_image::AccumulatedImage,
-    image::Image,
-    renderer::{self, Renderer},
-    scene::Scene,
-};
+use crate::raytracer::{self, AccumulatedImage, Renderer, Scene};
 
 pub struct MirrorApp {
     // Backend data
@@ -57,7 +47,7 @@ impl MirrorApp {
     }
 
     fn spawn_render_task(&mut self) {
-        self.render_join_handle = Some(self.runtime.spawn(renderer::render_task(
+        self.render_join_handle = Some(self.runtime.spawn(raytracer::render_task(
             self.renderer.clone(),
             self.render_image.clone(),
             self.scene.clone(),
