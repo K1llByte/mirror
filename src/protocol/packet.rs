@@ -6,8 +6,8 @@ use bincode::{Decode, Encode, config, decode_from_slice};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::raytracer::Image;
 use crate::raytracer::Scene;
+use crate::raytracer::{Image, Tile};
 
 /// Represents the main control packet used in the peer-to-peer network.
 #[derive(Debug, Encode, Decode)]
@@ -34,7 +34,7 @@ pub enum MirrorPacket {
     },
     /// Tile render response packet type, response oof the RenderTileRequest
     /// packet type.
-    RenderTileResponse(Image),
+    RenderTileResponse { tile: Tile, render_time: u128 },
 }
 
 #[derive(Debug, Error)]

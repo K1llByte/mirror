@@ -154,7 +154,9 @@ async fn remote_render_tile_task(
     peer_listen_address: SocketAddr,
     samples_per_pixel: usize,
 ) {
-    let mut time_peer_rendering: u128 = 0;
+    let mut accum_roudtrip_time: u128 = 0;
+    let mut accum_rendering_time: u128 = 0;
+
     let mut rendered_tiles = Vec::new();
 
     let (image_size, times_sampled) = {
@@ -164,6 +166,7 @@ async fn remote_render_tile_task(
 
     // Synchronize scene before requesting to render tiles
     {
+        let timer = Instant::now();
         let mut peer_table_guard = renderer.peer_table.write().await;
         let peer = peer_table_guard
             .get_mut(&peer_listen_address)
@@ -176,6 +179,7 @@ async fn remote_render_tile_task(
             error!("Remote work task failed to send render tile work");
             return;
         }
+        trace!("Time sending scene: {} ms", timer.elapsed().as_millis());
     }
 
     // Do render work until there's no more
@@ -184,13 +188,14 @@ async fn remote_render_tile_task(
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
             let tile = {
-                let timer = Instant::now();
+                let roundtrip_timer = Instant::now();
                 let tile_recv_queue = {
                     let mut peer_table_guard = renderer.peer_table.write().await;
                     let peer = peer_table_guard
                         .get_mut(&peer_listen_address)
                         .expect("Peer data should exist");
                     // Send render request
+                    // let timer = Instant::now();
                     if let Err(_) = (MirrorPacket::RenderTileRequest {
                         begin_pos: tile_render_work.begin_pos,
                         tile_size: tile_render_work.tile_size,
@@ -202,24 +207,32 @@ async fn remote_render_tile_task(
                     {
                         error!("Remote work task failed to send render tile work");
                         work_send_queue.send(tile_render_work).await.unwrap();
-                        return;
+                        break;
                     }
+                    // trace!("Time sending request: {} ms", timer.elapsed().as_millis());
                     peer.tile_recv_queue.clone()
                 };
 
                 // Receive render response
-                debug!("After receiving tile from queue");
-                let tile = match tile_recv_queue.recv().await {
+                let timer = Instant::now();
+                let (tile, render_time) = match tile_recv_queue.recv().await {
                     Ok(tile) => tile,
                     Err(_) => {
                         error!("Unexpected receiver queue error");
                         work_send_queue.send(tile_render_work).await.unwrap();
-                        return;
+                        break;
                     }
                 };
-                debug!("After receiving tile from queue");
+                let roundtrip_time = roundtrip_timer.elapsed().as_millis();
+                // trace!("Peer render time: {} ms", render_time);
+                // trace!(
+                //     "Time receiving response: {} ms",
+                //     timer.elapsed().as_millis()
+                // );
+                // trace!("Total time: {} ms", roundtrip_time);
 
-                time_peer_rendering += timer.elapsed().as_millis();
+                accum_rendering_time += render_time;
+                accum_roudtrip_time += roundtrip_time;
                 tile
             };
 
@@ -241,17 +254,25 @@ async fn remote_render_tile_task(
         let sampled_weight = times_sampled as f32 / total_samples as f32;
         let new_sample_weight = (samples_per_pixel as f32) / (total_samples as f32);
         let mut image_guard = render_image.write().await;
-        for (begin_pos, tile) in rendered_tiles {
-            image_guard.insert_tile_by(&tile, begin_pos, |c, n| {
+        for (begin_pos, tile) in rendered_tiles.iter() {
+            image_guard.insert_tile_by(&tile, *begin_pos, |c, n| {
                 c * sampled_weight + n * new_sample_weight
             });
         }
     }
 
+    let average_roudtrip_time = accum_roudtrip_time as f32 / rendered_tiles.len() as f32;
+    let average_rendering_time = accum_rendering_time as f32 / rendered_tiles.len() as f32;
+    let average_latency_time = average_roudtrip_time - average_rendering_time;
+    trace!("Rendered tiles: {}", rendered_tiles.len());
     trace!(
-        "Time remote peer spent rendering + latency: {} ms",
-        time_peer_rendering
+        "Average roundtrip time (rendering + latency): {} ms",
+        average_roudtrip_time
     );
+    trace!("Average rendering time: {} ms", average_rendering_time);
+    trace!("Average latency time: {} ms", average_latency_time);
+    trace!("Total roundtrip time {} ms", accum_roudtrip_time);
+    trace!("Total rendering time {} ms", accum_rendering_time);
 }
 
 pub async fn render_task(

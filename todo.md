@@ -1,17 +1,18 @@
 # In Progress
-## Simple path tracer - v1.0
 
 # Todo
 ## Simple path tracer - v1.0
 - [ ] Better logs:
-    - Remove Listen/Bootstrap tags
-    - Remove debug logs
-    - trace logs latency time on each render/sync packet sent,
-    - trace log on render tile request render time)
+    - [x] Remove Listen/Bootstrap tags
+    - [x] Remove debug logs
+    - [ ] trace logs latency time on each render/sync packet sent,
+    - [x] trace log on render tile request render time
+- [x] Add render time peer spent rendering in the RenderTileResponse
+- [ ] BVH 
+    - This will be used by the scheduler to provide more 
 - [ ] connect_to_peers methods should connect to all at the same time
 - [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
-
 - [ ] Benchmark (single task vs multi task vs multi task and remote nodes)
 - [ ] Documentation:
   - [ ] Update README.md with:: What it is, What technologies uses, How to use,
@@ -19,16 +20,18 @@
   - [ ] Code documentation
 
 ## Web client
+- [ ] New egui interface that compiles to webassembly
 - New option to create a web server instead of a native client.
 - Webserver will provide the webassembly compiled version of egui that will communicate
 with the node via websockets.
 
 ## Improved path tracer
+- Explore new BRDF models (Burley, Oren nayar, Chan, Callisto, GGX, Trowbridge-Reitz)
 - Diff-based scene update/synchronization between nodes
 - Gltf2 scene loading
 - Acceleration structure
 - Scheduler that considers node latency and performance score
-- Implement quadrilaterals
+- Implement quadrilaterals geometry
 - Meshes
 - Button to save rendered image to file
 
@@ -36,6 +39,7 @@ with the node via websockets.
 - [ ] FIXME: Hardcoded 127.0.0.1 for now, will change this to a Hello handshake returning an id
 - [ ] Github CI workflows
     - [ ] Create a dev branch and always active work there
+    - [ ] CI that checks unit tests
     - [ ] CI that checks clippy before merging into a releases branch
     - [ ] CI that builds a gh-pages branch that deploys webassembly generated project to the web
 - [ ] PeerTable should store peer data as Arc<Mutex<Peer>> instead of current approach
@@ -77,3 +81,6 @@ to work on it
 - [x] Fault tolerance: if fails to send, resend to queue.
 - [x] Cool new scene
 - [x] Fix render task never finishing when using remote peers
+- [x] Write Aabb tests
+- [x] Change project structure
+- [x] Fix Aabb inverse intersection

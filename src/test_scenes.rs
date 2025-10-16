@@ -71,7 +71,6 @@ pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
 }
 
 pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
-    let mut rng = rand::rng();
     let mut objects = Vec::new();
 
     objects.push(Model {
