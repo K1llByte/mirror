@@ -122,8 +122,7 @@ async fn local_render_tile_task(
             rendered_tiles.push((tile_render_work.begin_pos, tile));
             // Decrement number of remainder tiles to be rendered and close
             // shared send queue to signal other tasks to end work.
-            remaining_tiles.fetch_sub(1, atomic::Ordering::Relaxed);
-            if remaining_tiles.load(atomic::Ordering::Relaxed) == 0 {
+            if remaining_tiles.fetch_sub(1, atomic::Ordering::Relaxed) <= 1 {
                 work_send_queue.close();
             }
         } else {
@@ -209,6 +208,7 @@ async fn remote_render_tile_task(
                 };
 
                 // Receive render response
+                debug!("After receiving tile from queue");
                 let tile = match tile_recv_queue.recv().await {
                     Ok(tile) => tile,
                     Err(_) => {
@@ -217,6 +217,8 @@ async fn remote_render_tile_task(
                         return;
                     }
                 };
+                debug!("After receiving tile from queue");
+
                 time_peer_rendering += timer.elapsed().as_millis();
                 tile
             };
@@ -225,7 +227,7 @@ async fn remote_render_tile_task(
 
             // Decrement number of remainder tiles to be rendered and close
             // channel so other tasks can finish and join.
-            if remaining_tiles.fetch_sub(1, atomic::Ordering::Relaxed) == 0 {
+            if remaining_tiles.fetch_sub(1, atomic::Ordering::Relaxed) <= 1 {
                 work_send_queue.close();
             }
         } else {
@@ -247,7 +249,7 @@ async fn remote_render_tile_task(
     }
 
     trace!(
-        "Time remoote peer spent rendering + latency: {} ms",
+        "Time remote peer spent rendering + latency: {} ms",
         time_peer_rendering
     );
 }

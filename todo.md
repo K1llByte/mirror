@@ -1,10 +1,13 @@
 # In Progress
 ## Simple path tracer - v1.0
-- [ ] Fix render task never finishing when using remote peers
 
 # Todo
 ## Simple path tracer - v1.0
-- [ ] Better logs (trace log latency time on each render/sync packet sent, trace log on render tile request render time)
+- [ ] Better logs:
+    - Remove Listen/Bootstrap tags
+    - Remove debug logs
+    - trace logs latency time on each render/sync packet sent,
+    - trace log on render tile request render time)
 - [ ] connect_to_peers methods should connect to all at the same time
 - [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
@@ -73,3 +76,4 @@ to work on it
 - [x] Make times_sampled a field in Image (AccumulatedImage)
 - [x] Fault tolerance: if fails to send, resend to queue.
 - [x] Cool new scene
+- [x] Fix render task never finishing when using remote peers
