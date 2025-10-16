@@ -1,15 +1,8 @@
 # In Progress
+- [ ] BVH 
 
 # Todo
 ## Simple path tracer - v1.0
-- [ ] Better logs:
-    - [x] Remove Listen/Bootstrap tags
-    - [x] Remove debug logs
-    - [x] trace logs latency time on each render/sync packet sent,
-    - [x] trace log on render tile request render time
-- [x] Add render time peer spent rendering in the RenderTileResponse
-- [ ] BVH 
-    - This will be used by the scheduler to provide more 
 - [ ] connect_to_peers methods should connect to all at the same time
 - [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
@@ -84,3 +77,9 @@ to work on it
 - [x] Write Aabb tests
 - [x] Change project structure
 - [x] Fix Aabb inverse intersection
+- [x] Better logs:
+    - [x] Remove Listen/Bootstrap tags
+    - [x] Remove debug logs
+    - [x] trace logs latency time on each render/sync packet sent,
+    - [x] trace log on render tile request render time
+- [x] Add render time peer spent rendering in the RenderTileResponse
