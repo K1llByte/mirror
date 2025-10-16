@@ -189,13 +189,17 @@ async fn remote_render_tile_task(
             // Do work
             let tile = {
                 let roundtrip_timer = Instant::now();
+                let lock_wait_timer = Instant::now();
                 let tile_recv_queue = {
                     let mut peer_table_guard = renderer.peer_table.write().await;
                     let peer = peer_table_guard
                         .get_mut(&peer_listen_address)
                         .expect("Peer data should exist");
+                    trace!(
+                        "Time waiting for write lock: {} ms",
+                        lock_wait_timer.elapsed().as_millis()
+                    );
                     // Send render request
-                    // let timer = Instant::now();
                     if let Err(_) = (MirrorPacket::RenderTileRequest {
                         begin_pos: tile_render_work.begin_pos,
                         tile_size: tile_render_work.tile_size,
@@ -214,7 +218,6 @@ async fn remote_render_tile_task(
                 };
 
                 // Receive render response
-                let timer = Instant::now();
                 let (tile, render_time) = match tile_recv_queue.recv().await {
                     Ok(tile) => tile,
                     Err(_) => {
@@ -223,14 +226,8 @@ async fn remote_render_tile_task(
                         break;
                     }
                 };
-                let roundtrip_time = roundtrip_timer.elapsed().as_millis();
-                // trace!("Peer render time: {} ms", render_time);
-                // trace!(
-                //     "Time receiving response: {} ms",
-                //     timer.elapsed().as_millis()
-                // );
-                // trace!("Total time: {} ms", roundtrip_time);
 
+                let roundtrip_time = roundtrip_timer.elapsed().as_millis();
                 accum_rendering_time += render_time;
                 accum_roudtrip_time += roundtrip_time;
                 tile

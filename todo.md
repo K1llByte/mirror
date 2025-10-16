@@ -5,7 +5,7 @@
 - [ ] Better logs:
     - [x] Remove Listen/Bootstrap tags
     - [x] Remove debug logs
-    - [ ] trace logs latency time on each render/sync packet sent,
+    - [x] trace logs latency time on each render/sync packet sent,
     - [x] trace log on render tile request render time
 - [x] Add render time peer spent rendering in the RenderTileResponse
 - [ ] BVH 
