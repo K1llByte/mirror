@@ -1,9 +1,16 @@
 # In Progress
-- [ ] BVH 
-    - [ ] Reimplement tmin tmax in Ray
+- [ ] BVH
+    - [ ] In hit(&Ray) function make ray mutable or create a new ray everytime we change tmin and tmax
+    - [ ] Reimplement tmin tmax in Ray (This will have performance improvements
+    since intersection with aabb's will early return for far away boxes)
+    - [x] Use comparison axis with longest extent of node aabb
 
 # Todo
 ## Simple path tracer - v1.0
+- [ ] Lights
+- [ ] Quads
+- [ ] Volumes
+- [ ] Textures
 - [ ] connect_to_peers methods should connect to all at the same time
 - [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
@@ -12,6 +19,7 @@
   - [ ] Update README.md with:: What it is, What technologies uses, How to use,
   how it works, references and documentation
   - [ ] Code documentation
+
 
 ## Web client
 - [ ] New egui interface that compiles to webassembly
@@ -23,11 +31,8 @@ with the node via websockets.
 - Explore new BRDF models (Burley, Oren nayar, Chan, Callisto, GGX, Trowbridge-Reitz)
 - Diff-based scene update/synchronization between nodes
 - Gltf2 scene loading
-- Acceleration structure
 - Scheduler that considers node latency and performance score
-- Implement quadrilaterals geometry
 - Meshes
-- Button to save rendered image to file
 
 ## Unsorted
 - [ ] FIXME: Hardcoded 127.0.0.1 for now, will change this to a Hello handshake returning an id
@@ -38,6 +43,7 @@ with the node via websockets.
     - [ ] CI that builds a gh-pages branch that deploys webassembly generated project to the web
 - [ ] PeerTable should store peer data as Arc<Mutex<Peer>> instead of current approach
 - [ ] Implement some image denoising algorithm such as bilateral filter
+- [ ] Button to save rendered image to file
 
 ____________________________________________________________________________________
 

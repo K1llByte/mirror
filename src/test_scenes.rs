@@ -1,10 +1,11 @@
 use core::f32;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use glam::Vec3;
 use rand::Rng;
 
-use mirror::raytracer::{Camera, Material, Model, Scene, Sphere};
+use mirror::raytracer::{BvhNode, Camera, Material, Model, Scene, Sphere};
+use tracing::debug;
 
 pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
     // Spheres
@@ -41,39 +42,39 @@ pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
     });
 
     // Scene
-    Scene {
-        camera: Camera::new(
+    Scene::new(
+        Camera::new(
             Vec3::new(0.0, 6.0, 5.0),
             Vec3::new(0.0, -1.0, -1.0).normalize(),
             Vec3::new(0.0, -1.0, 0.0).normalize(),
             100.0,
             cam_aspect_ratio,
         ),
-        objects: vec![
-            Model {
+        vec![
+            Arc::new(Model {
                 geometry: sphere_left,
-                material: left_mat.clone(), // center_mat.clone(),
-            },
-            Model {
+                material: left_mat.clone(),
+            }),
+            Arc::new(Model {
                 geometry: sphere_center,
                 material: center_mat.clone(),
-            },
-            Model {
+            }),
+            Arc::new(Model {
                 geometry: sphere_right,
                 material: right_mat.clone(),
-            },
-            Model {
+            }),
+            Arc::new(Model {
                 geometry: sphere_ground,
                 material: ground_mat.clone(),
-            },
+            }),
         ],
-    }
+    )
 }
 
 pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
     let mut objects = Vec::new();
 
-    objects.push(Model {
+    objects.push(Arc::new(Model {
         geometry: Sphere {
             position: Vec3::new(0.0, -1000.5, -1.0),
             radius: 1000.0,
@@ -81,7 +82,7 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
         material: Arc::new(Material::Diffuse {
             albedo: Vec3::new(0.42, 0.42, 0.6),
         }),
-    });
+    }));
 
     let mut random_circle = |radius: f32, count: usize, mat: Arc<Material>| {
         for i in 0..count {
@@ -89,13 +90,13 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
 
             let x = radius * f32::sin(ang);
             let z = radius * f32::cos(ang);
-            objects.push(Model {
+            objects.push(Arc::new(Model {
                 geometry: Sphere {
                     position: Vec3 { x, y: 0.0, z },
                     radius: 0.5,
                 },
                 material: mat.clone(),
-            });
+            }));
         }
     };
 
@@ -143,8 +144,8 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
     random_circle(10.0, 26, random_diffuse());
     random_circle(12.0, 32, random_metalic());
 
-    Scene {
-        camera: Camera::new(
+    Scene::new(
+        Camera::new(
             Vec3::new(0.0, 6.0, 10.0),
             Vec3::new(0.0, -1.0, -1.0).normalize(),
             Vec3::new(0.0, -1.0, 0.0).normalize(),
@@ -152,5 +153,5 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
             cam_aspect_ratio,
         ),
         objects,
-    }
+    )
 }

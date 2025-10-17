@@ -73,7 +73,7 @@ impl Renderer {
                         + rng.random_range(0.0..(2.0 / image_size.1 as f32));
 
                     // Trace pixel color
-                    let ray = scene.camera.create_viewport_ray(sample_u, sample_v);
+                    let ray = scene.camera().create_viewport_ray(sample_u, sample_v);
                     let sample_color = self.trace(&scene, &ray, self.max_bounces);
 
                     pixel_color += sample_color * sample_weight;
@@ -195,10 +195,10 @@ async fn remote_render_tile_task(
                     let peer = peer_table_guard
                         .get_mut(&peer_listen_address)
                         .expect("Peer data should exist");
-                    trace!(
-                        "Time waiting for write lock: {} ms",
-                        lock_wait_timer.elapsed().as_millis()
-                    );
+                    // trace!(
+                    //     "Time waiting for write lock: {} ms",
+                    //     lock_wait_timer.elapsed().as_millis()
+                    // );
                     // Send render request
                     if let Err(_) = (MirrorPacket::RenderTileRequest {
                         begin_pos: tile_render_work.begin_pos,

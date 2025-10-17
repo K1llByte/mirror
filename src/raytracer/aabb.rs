@@ -1,5 +1,6 @@
 use core::f32;
 
+use bincode::{Decode, Encode};
 use glam::Vec3;
 
 use crate::raytracer::Ray;
@@ -8,13 +9,22 @@ pub trait Intersectable {
     fn intersect(&self, ray: &Ray) -> bool;
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Encode, Decode)]
 pub struct Aabb {
+    #[bincode(with_serde)]
     pub min_position: Vec3,
+    #[bincode(with_serde)]
     pub max_position: Vec3,
 }
 
 impl Aabb {
+    pub fn empty() -> Self {
+        Self {
+            min_position: Vec3::INFINITY,
+            max_position: Vec3::NEG_INFINITY,
+        }
+    }
+
     pub fn new(position: Vec3, size: Vec3) -> Self {
         assert!(
             size.x > 0.0 && size.y > 0.0 && size.z > 0.0,
@@ -34,7 +44,7 @@ impl Aabb {
         }
     }
 
-    pub fn surrounding_box(aabb1: &Aabb, aabb2: &Aabb) -> Self {
+    pub fn surround(aabb1: &Aabb, aabb2: &Aabb) -> Self {
         Self {
             min_position: aabb1.min_position.min(aabb2.min_position),
             max_position: aabb1.max_position.max(aabb2.max_position),
