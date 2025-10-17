@@ -1,5 +1,5 @@
 # In Progress
-- [ ] Quads
+- [ ] Cuboid 
 
 # Todo
 ## Simple path tracer - v1.0
@@ -93,3 +93,4 @@ to work on it
     - [x] Create a new ray everytime we change tmin and tmax
     since intersection with aabb's will early return for far away boxes)
     - [x] Use comparison axis with longest extent of node aabb
+- [x] Quads
