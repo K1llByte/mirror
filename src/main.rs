@@ -6,6 +6,7 @@ use std::thread;
 
 use chrono::Local;
 use clap::Parser;
+use glam::Vec3;
 use mirror::editor;
 use tokio::sync::RwLock;
 use tracing::info;

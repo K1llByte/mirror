@@ -1,5 +1,6 @@
 # In Progress
 - [ ] BVH 
+    - [ ] Reimplement tmin tmax in Ray
 
 # Todo
 ## Simple path tracer - v1.0

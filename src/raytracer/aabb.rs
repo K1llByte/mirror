@@ -8,9 +8,10 @@ pub trait Intersectable {
     fn intersect(&self, ray: &Ray) -> bool;
 }
 
+#[derive(Clone)]
 pub struct Aabb {
-    min_position: Vec3,
-    max_position: Vec3,
+    pub min_position: Vec3,
+    pub max_position: Vec3,
 }
 
 impl Aabb {
@@ -30,6 +31,13 @@ impl Aabb {
         Self {
             min_position,
             max_position,
+        }
+    }
+
+    pub fn surrounding_box(aabb1: &Aabb, aabb2: &Aabb) -> Self {
+        Self {
+            min_position: aabb1.min_position.min(aabb2.min_position),
+            max_position: aabb1.max_position.max(aabb2.max_position),
         }
     }
 }

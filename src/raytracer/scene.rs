@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use bincode::{Decode, Encode};
 use glam::Vec3;
 
-use crate::raytracer::{Camera, Material, Ray};
+use crate::raytracer::{Aabb, Camera, Intersectable, Material, Ray};
 
 pub struct Hit {
     pub distance: f32,
