@@ -35,8 +35,6 @@ pub struct Model {
 
 impl Hittable for Model {
     fn hit(&self, ray: &Ray) -> Option<Hit> {
-        const MIN_RAY_DISTANCE: f32 = 0.001;
-
         let oc = self.geometry.position - ray.origin();
         let a = ray.direction().dot(ray.direction());
         let half_b = ray.direction().dot(oc);
@@ -45,12 +43,12 @@ impl Hittable for Model {
 
         // Check if first solution is valid
         let mut distance = (half_b - discriminant.sqrt()) / a;
-        if distance < MIN_RAY_DISTANCE {
+        if distance < ray.tmin() || distance > ray.tmax() {
             // Check if second solution is valid
             // Note: its possible this second solution is the same as solution 1
             // in case the discriminant was zero.
             distance = (half_b + discriminant.sqrt()) / a;
-            if distance < MIN_RAY_DISTANCE {
+            if distance < ray.tmin() || distance > ray.tmax() {
                 // Both possible solutions are behind camera
                 return None;
             }
@@ -84,16 +82,17 @@ pub struct Scene {
     camera: Camera,
     objects: Vec<Arc<Model>>,
     bvh: BvhNode<Model>,
+    use_bvh: bool,
 }
 
 impl Scene {
     pub fn new(camera: Camera, mut objects: Vec<Arc<Model>>) -> Self {
         let bvh = BvhNode::new(&mut objects[..]);
-        debug!("BVH depth: {}", bvh.depth());
         Self {
             camera,
             objects,
             bvh,
+            use_bvh: true,
         }
     }
 
@@ -108,10 +107,10 @@ impl Scene {
 
 impl Hittable for Scene {
     fn hit(&self, ray: &Ray) -> Option<Hit> {
-        if true {
-            // Use vec
-            const MAX_RAY_DISTANCE: f32 = 1000.0;
-            let mut closest_hit_distance = MAX_RAY_DISTANCE;
+        if self.use_bvh {
+            self.bvh.hit(&ray)
+        } else {
+            let mut closest_hit_distance = ray.tmax();
             let mut closest_hit = None;
             for sphere in self.objects.iter() {
                 if let Some(hit) = sphere.hit(&ray) {
@@ -122,9 +121,6 @@ impl Hittable for Scene {
                 }
             }
             closest_hit
-        } else {
-            // Use bvh
-            self.bvh.hit(&ray)
         }
     }
 }

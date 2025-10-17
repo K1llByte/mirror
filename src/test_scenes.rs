@@ -143,11 +143,13 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
     random_circle(8.0, 20, random_metalic());
     random_circle(10.0, 26, random_diffuse());
     random_circle(12.0, 32, random_metalic());
+    random_circle(14.0, 50, random_metalic());
+    random_circle(16.0, 60, random_metalic());
 
     Scene::new(
         Camera::new(
-            Vec3::new(0.0, 6.0, 10.0),
-            Vec3::new(0.0, -1.0, -1.0).normalize(),
+            Vec3::new(0.0, 1.0, 10.0),
+            Vec3::new(0.0, -0.3, -1.0).normalize(),
             Vec3::new(0.0, -1.0, 0.0).normalize(),
             100.0,
             cam_aspect_ratio,

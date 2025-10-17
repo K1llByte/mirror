@@ -9,7 +9,7 @@ use clap::Parser;
 use glam::Vec3;
 use mirror::editor;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
 use crate::test_scenes::*;

@@ -37,15 +37,6 @@ impl<H: Hittable + Bounded> BvhNode<H> {
         for h in elems.iter() {
             aabb = Aabb::surround(&aabb, &h.aabb());
         }
-        debug!(
-            "Aabb: ({},{},{}), ({},{},{})",
-            aabb.min_position.x,
-            aabb.min_position.y,
-            aabb.min_position.z,
-            aabb.max_position.x,
-            aabb.max_position.y,
-            aabb.max_position.z
-        );
         let cmp_axis = (aabb.max_position - aabb.min_position).max_position();
 
         match elems.len() {
@@ -88,15 +79,16 @@ impl<H: Hittable + Bounded> Hittable for BvhNode<H> {
                 }
 
                 let left_hit = left.hit(&ray);
-                let right_hit = right.hit(&ray);
-
-                // FIXME: This depends on tmin/tmax rafactor
-                let left_distance = left_hit.as_ref().map(|h| h.distance).unwrap_or(f32::MAX);
-                let right_distance = right_hit.as_ref().map(|h| h.distance).unwrap_or(f32::MAX);
-                if left_distance < right_distance {
-                    left_hit
+                let right_hit = if let Some(h) = &left_hit {
+                    right.hit(&ray.with_tmax(h.distance))
                 } else {
+                    right.hit(&ray)
+                };
+
+                if right_hit.is_some() {
                     right_hit
+                } else {
+                    left_hit
                 }
             }
             Self::Leaf(obj) => {

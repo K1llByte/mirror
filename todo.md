@@ -1,9 +1,4 @@
 # In Progress
-- [ ] BVH
-    - [ ] In hit(&Ray) function make ray mutable or create a new ray everytime we change tmin and tmax
-    - [ ] Reimplement tmin tmax in Ray (This will have performance improvements
-    since intersection with aabb's will early return for far away boxes)
-    - [x] Use comparison axis with longest extent of node aabb
 
 # Todo
 ## Simple path tracer - v1.0
@@ -90,3 +85,11 @@ to work on it
     - [x] trace logs latency time on each render/sync packet sent,
     - [x] trace log on render tile request render time
 - [x] Add render time peer spent rendering in the RenderTileResponse
+- [x] BVH
+    - [x] Reimplement tmin tmax in Ray (This will have performance improvements
+        - [x] Reimplement tmin tmax in Sphere
+        - [x] Reimplement tmin tmax in Aabb
+        - [x] Reimplement tmin tmax in BvhNode
+    - [x] Create a new ray everytime we change tmin and tmax
+    since intersection with aabb's will early return for far away boxes)
+    - [x] Use comparison axis with longest extent of node aabb

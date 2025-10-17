@@ -64,10 +64,10 @@ impl Intersectable for Aabb {
 
         let t0 = (self.min_position - ray.origin()) * inv_dir;
         let t1 = (self.max_position - ray.origin()) * inv_dir;
-        let t_min = Vec3::min(t0, t1);
-        let t_max = Vec3::max(t0, t1);
-        let t_enter = t_min.max_element();
-        let t_exit = t_max.min_element();
+        let t_min = t0.min(t1);
+        let t_max = t0.max(t1);
+        let t_enter = t_min.max_element().max(ray.tmin());
+        let t_exit = t_max.min_element().min(ray.tmax());
         t_enter <= t_exit && t_exit >= 0.0
     }
 }
