@@ -1,9 +1,9 @@
 # In Progress
+- [ ] Quads
 
 # Todo
 ## Simple path tracer - v1.0
 - [ ] Lights
-- [ ] Quads
 - [ ] Volumes
 - [ ] Textures
 - [ ] connect_to_peers methods should connect to all at the same time

@@ -75,7 +75,7 @@ fn main() -> anyhow::Result<()> {
 
     let peer_table = Arc::new(RwLock::new(HashMap::<SocketAddr, Peer>::new()));
     let renderer = Arc::new(Renderer::new(peer_table.clone()));
-    let scene = Arc::new(spheres2_scene(16.0 / 9.0));
+    let scene = Arc::new(quads_scene(16.0 / 9.0));
 
     let listen_task_future = runtime.spawn(listen_task(
         renderer.clone(),

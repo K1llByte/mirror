@@ -4,24 +4,24 @@ use std::{sync::Arc, time::Instant};
 use glam::Vec3;
 use rand::Rng;
 
-use mirror::raytracer::{BvhNode, Camera, Material, Model, Scene, Sphere};
+use mirror::raytracer::{BvhNode, Camera, Geometry, Material, Model, Scene};
 use tracing::debug;
 
 pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
     // Spheres
-    let sphere_left = Sphere {
+    let sphere_left = Geometry::Sphere {
         position: Vec3::new(-1.0, 0.0, -1.0),
         radius: 0.5,
     };
-    let sphere_center = Sphere {
+    let sphere_center = Geometry::Sphere {
         position: Vec3::new(0.0, 0.0, -1.0),
         radius: 0.5,
     };
-    let sphere_right = Sphere {
+    let sphere_right = Geometry::Sphere {
         position: Vec3::new(1.0, 0.0, -1.0),
         radius: 0.5,
     };
-    let sphere_ground = Sphere {
+    let sphere_ground = Geometry::Sphere {
         position: Vec3::new(0.0, -1000.5, -1.0),
         radius: 1000.0,
     };
@@ -74,8 +74,9 @@ pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
 pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
     let mut objects = Vec::new();
 
+    // Ground sphere
     objects.push(Arc::new(Model {
-        geometry: Sphere {
+        geometry: Geometry::Sphere {
             position: Vec3::new(0.0, -1000.5, -1.0),
             radius: 1000.0,
         },
@@ -91,7 +92,7 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
             let x = radius * f32::sin(ang);
             let z = radius * f32::cos(ang);
             objects.push(Arc::new(Model {
-                geometry: Sphere {
+                geometry: Geometry::Sphere {
                     position: Vec3 { x, y: 0.0, z },
                     radius: 0.5,
                 },
@@ -153,6 +154,82 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
             Vec3::new(0.0, -1.0, 0.0).normalize(),
             100.0,
             cam_aspect_ratio,
+        ),
+        objects,
+    )
+}
+
+pub fn quads_scene(cam_aspect_ratio: f32) -> Scene {
+    let mut objects = Vec::new();
+
+    let right_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(1.0, 0.2, 0.2),
+    });
+    let left_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.2, 1.0, 0.2),
+    });
+    let front_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.2, 0.2, 1.0),
+    });
+    let up_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(1.0, 0.5, 0.0),
+    });
+    let down_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.2, 0.8, 0.8),
+    });
+
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(-3.0, -2.0, 5.0),
+            u: Vec3::new(0.0, 0.0, -4.0),
+            v: Vec3::new(0.0, 4.0, 0.0),
+        },
+        right_mat.clone(),
+    )));
+
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(-2.0, -2.0, 0.0),
+            u: Vec3::new(4.0, 0.0, 0.0),
+            v: Vec3::new(0.0, 4.0, 0.0),
+        },
+        front_mat.clone(),
+    )));
+
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(3.0, -2.0, 1.0),
+            u: Vec3::new(0.0, 0.0, 4.0),
+            v: Vec3::new(0.0, 4.0, 0.0),
+        },
+        left_mat.clone(),
+    )));
+
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(-2.0, 3.0, 1.0),
+            u: Vec3::new(4.0, 0.0, 0.0),
+            v: Vec3::new(0.0, 0.0, 4.0),
+        },
+        up_mat.clone(),
+    )));
+
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(-2.0, -3.0, 5.0),
+            u: Vec3::new(4.0, 0.0, 0.0),
+            v: Vec3::new(0.0, 0.0, -4.0),
+        },
+        down_mat.clone(),
+    )));
+
+    Scene::new(
+        Camera::new(
+            Vec3::new(0.0, 0.0, 8.0),
+            Vec3::new(0.0, 0.0, -1.0).normalize(),
+            Vec3::new(0.0, -1.0, 0.0).normalize(),
+            90.0,
+            1.0, //cam_aspect_ratio,
         ),
         objects,
     )

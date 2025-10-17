@@ -4,19 +4,10 @@ use std::sync::Arc;
 use bincode::{Decode, Encode};
 use tracing::debug;
 
-use crate::raytracer::{Aabb, Hit, Hittable, Intersectable, Model, Ray};
+use crate::raytracer::{Aabb, Geometry, Hit, Hittable, Intersectable, Model, Ray};
 
 pub trait Bounded {
     fn aabb(&self) -> Aabb;
-}
-
-impl Bounded for Model {
-    fn aabb(&self) -> Aabb {
-        Aabb::from_positions(
-            self.geometry.position - self.geometry.radius,
-            self.geometry.position + self.geometry.radius,
-        )
-    }
 }
 
 #[derive(Debug, Clone, Encode, Decode)]
