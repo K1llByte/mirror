@@ -7,6 +7,10 @@ use crate::utils;
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub enum Material {
+    DiffuseLight {
+        #[bincode(with_serde)]
+        emission: Vec3,
+    },
     Diffuse {
         #[bincode(with_serde)]
         albedo: Vec3,
@@ -31,6 +35,7 @@ impl Material {
         let mut rng = rand::rng();
 
         match self {
+            Self::DiffuseLight { .. } => None,
             Self::Diffuse { albedo } => {
                 let rnd_dir = utils::random_vector(&mut rng);
                 let mut direction = (hit.normal + rnd_dir).normalize();
@@ -93,5 +98,12 @@ impl Material {
                 })
             }
         }
+    }
+
+    pub fn emission(&self) -> Vec3 {
+        if let Self::DiffuseLight { emission } = &self {
+            return *emission;
+        }
+        Vec3::new(0.0, 0.0, 0.0)
     }
 }

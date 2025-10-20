@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::f32::consts::PI;
 use std::net::SocketAddr;
 use std::num::NonZero;
 use std::sync::Arc;
@@ -8,6 +9,7 @@ use chrono::Local;
 use clap::Parser;
 use glam::Vec3;
 use mirror::editor;
+use mirror::utils::spherical_to_cartesian;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
@@ -27,6 +29,8 @@ struct Args {
     config: Option<String>,
     #[arg(short, long, default_value_t = false)]
     no_gui: bool,
+    #[arg(short, long)]
+    scene: Option<String>,
 }
 
 struct CustomTime;
@@ -39,6 +43,8 @@ impl FormatTime for CustomTime {
 }
 
 fn main() -> anyhow::Result<()> {
+    // println!("{}", spherical_to_cartesian(Vec3::new(1.0, PI, 0.0)));
+
     // Create tokio runtime.
     // let runtime = tokio::runtime::Runtime::new()?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -75,7 +81,20 @@ fn main() -> anyhow::Result<()> {
 
     let peer_table = Arc::new(RwLock::new(HashMap::<SocketAddr, Peer>::new()));
     let renderer = Arc::new(Renderer::new(peer_table.clone()));
-    let scene = Arc::new(quads_scene(16.0 / 9.0));
+    let scene = Arc::new({
+        let aspect_ratio = 16.0 / 9.0;
+        match args.scene.as_deref() {
+            Some("cornell") => cornell_scene(aspect_ratio),
+            Some("spheres") => spheres_scene(aspect_ratio),
+            Some("spheres2") => spheres2_scene(aspect_ratio),
+            Some("quads") => quads_scene(aspect_ratio),
+            None => spheres_scene(aspect_ratio),
+            _ => {
+                tracing::error!("Unkown scene '{}'", args.scene.unwrap());
+                return Ok(());
+            }
+        }
+    });
 
     let listen_task_future = runtime.spawn(listen_task(
         renderer.clone(),

@@ -42,7 +42,7 @@ pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
     });
 
     // Scene
-    Scene::new(
+    Scene::with_background(
         Camera::new(
             Vec3::new(0.0, 6.0, 5.0),
             Vec3::new(0.0, -1.0, -1.0).normalize(),
@@ -68,6 +68,7 @@ pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
                 material: ground_mat.clone(),
             }),
         ],
+        Vec3::new(0.70, 0.80, 1.00),
     )
 }
 
@@ -147,7 +148,7 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
     random_circle(14.0, 50, random_metalic());
     random_circle(16.0, 60, random_metalic());
 
-    Scene::new(
+    Scene::with_background(
         Camera::new(
             Vec3::new(0.0, 1.0, 10.0),
             Vec3::new(0.0, -0.3, -1.0).normalize(),
@@ -156,6 +157,7 @@ pub fn spheres2_scene(cam_aspect_ratio: f32) -> Scene {
             cam_aspect_ratio,
         ),
         objects,
+        Vec3::new(0.70, 0.80, 1.00),
     )
 }
 
@@ -223,6 +225,16 @@ pub fn quads_scene(cam_aspect_ratio: f32) -> Scene {
         down_mat.clone(),
     )));
 
+    objects.push(Arc::new(Model::new(
+        Geometry::Sphere {
+            position: Vec3::new(0.0, 0.0, 2.0),
+            radius: 1.0,
+        },
+        Arc::new(Material::DiffuseLight {
+            emission: Vec3::new(4.0, 4.0, 4.0),
+        }),
+    )));
+
     Scene::new(
         Camera::new(
             Vec3::new(0.0, 0.0, 8.0),
@@ -232,5 +244,86 @@ pub fn quads_scene(cam_aspect_ratio: f32) -> Scene {
             1.0, //cam_aspect_ratio,
         ),
         objects,
+    )
+}
+
+pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
+    let mut objects = Vec::new();
+
+    let red_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.65, 0.05, 0.05),
+    });
+    let green_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.12, 0.45, 0.15),
+    });
+    let white_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.73, 0.73, 0.73),
+    });
+    let light_mat = Arc::new(Material::DiffuseLight {
+        emission: Vec3::new(15.0, 15.0, 15.0),
+    });
+
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(555.0, 0.0, 0.0),
+            u: Vec3::new(0.0, 0.0, 555.0),
+            v: Vec3::new(0.0, 555.0, 0.0),
+        },
+        green_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(0.0, 0.0, 0.0),
+            u: Vec3::new(0.0, 555.0, 0.0),
+            v: Vec3::new(0.0, 0.0, 555.0),
+        },
+        red_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(0.0, 0.0, 0.0),
+            u: Vec3::new(0.0, 0.0, 555.0),
+            v: Vec3::new(555.0, 0.0, 0.0),
+        },
+        white_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(555.0, 555.0, 555.0),
+            u: Vec3::new(-555.0, 0.0, 0.0),
+            v: Vec3::new(0.0, 0.0, -555.0),
+        },
+        white_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(0.0, 0.0, 555.0),
+            u: Vec3::new(0.0, 555.0, 0.0),
+            v: Vec3::new(555.0, 0.0, 0.0),
+        },
+        white_mat.clone(),
+    )));
+
+    // Light
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(343.0, 554.0, 332.0),
+            u: Vec3::new(-130.0, 0.0, 0.0),
+            v: Vec3::new(0.0, 0.0, -105.0),
+        },
+        light_mat.clone(),
+    )));
+
+    Scene::with_background(
+        Camera::new(
+            Vec3::new(278.0, 278.0, -800.0),
+            Vec3::new(0.0, 0.0, 1.0).normalize(),
+            Vec3::new(0.0, -1.0, 0.0).normalize(),
+            40.0,
+            1.0, //cam_aspect_ratio,
+        ),
+        objects,
+        // Vec3::new(0.70, 0.80, 1.00),
+        Vec3::new(0.0, 0.0, 0.0),
     )
 }

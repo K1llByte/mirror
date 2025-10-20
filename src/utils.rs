@@ -19,11 +19,26 @@ pub fn spherical_to_cartesian(v: Vec3) -> Vec3 {
     let azimuth = v.z;
 
     Vec3::new(
+        radius * polar.sin() * azimuth.cos(),
         radius * polar.sin() * azimuth.sin(),
-        radius * azimuth.cos(),
-        radius * azimuth.sin() * polar.cos(),
+        radius * polar.cos(),
     )
 }
+
+/// Return a normalized random vector
+// pub fn random_vector(rng: &mut impl Rng) -> Vec3 {
+//     loop {
+//         let p = Vec3::new(
+//             rng.random_range(-1.0..1.0),
+//             rng.random_range(-1.0..1.0),
+//             rng.random_range(-1.0..1.0),
+//         );
+//         let lensq = p.length_squared();
+//         if f32::MIN_POSITIVE < lensq && lensq <= 1.0 {
+//             return p / lensq.sqrt();
+//         }
+//     }
+// }
 
 /// Return a normalized random vector
 pub fn random_vector(rng: &mut impl Rng) -> Vec3 {

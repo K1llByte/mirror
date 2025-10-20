@@ -176,6 +176,8 @@ impl Bounded for Model {
 pub struct Scene {
     camera: Camera,
     objects: Vec<Arc<Model>>,
+    #[bincode(with_serde)]
+    background: Vec3,
     bvh: BvhNode<Model>,
     use_bvh: bool,
 }
@@ -186,6 +188,18 @@ impl Scene {
         Self {
             camera,
             objects,
+            background: Vec3::ZERO,
+            bvh,
+            use_bvh: true,
+        }
+    }
+
+    pub fn with_background(camera: Camera, mut objects: Vec<Arc<Model>>, background: Vec3) -> Self {
+        let bvh = BvhNode::new(&mut objects[..]);
+        Self {
+            camera,
+            objects,
+            background,
             bvh,
             use_bvh: true,
         }
@@ -197,6 +211,10 @@ impl Scene {
 
     pub fn objects(&self) -> &[Arc<Model>] {
         &self.objects
+    }
+
+    pub fn background(&self) -> Vec3 {
+        self.background
     }
 }
 

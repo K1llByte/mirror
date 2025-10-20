@@ -1,31 +1,40 @@
 # In Progress
+- [x] Cornell box scene
 - [ ] Cuboid
 
 # Todo
 ## Simple path tracer - v1.0
-- [ ] Lights
+- [ ] Fix non rendering face of geometry is rendering as opaque color
+- [ ] Transform
+    - [ ] Translation
+    - [ ] Rotation
+    - [ ] Scale
 - [ ] Volumes
 - [ ] Textures
 - [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
 - [ ] Benchmark (single task vs multi task vs multi task and remote nodes)
 - [ ] Documentation:
-  - [ ] Update README.md with:: What it is, What technologies uses, How to use,
+  - [ ] Update README.md with: What it is, What technologies uses, How to use,
   how it works, references and documentation
   - [ ] Code documentation
 
-
 ## Web client
 - [ ] New egui interface that compiles to webassembly
+- [ ] Experiment with tokio for webassembly
 - New option to create a web server instead of a native client.
 - Webserver will provide the webassembly compiled version of egui that will communicate
 with the node via websockets.
+
+## Improved scheduler
+- Scheduler that considers node latency and performance score
+- Scheduler that distributes workload based on local performance
+
 
 ## Improved path tracer
 - Explore new BRDF models (Burley, Oren nayar, Chan, Callisto, GGX, Trowbridge-Reitz)
 - Diff-based scene update/synchronization between nodes
 - Gltf2 scene loading
-- Scheduler that considers node latency and performance score
 - Meshes
 
 ## Unsorted
@@ -95,3 +104,4 @@ to work on it
     - [x] Use comparison axis with longest extent of node aabb
 - [x] Quads
 - [x] Fix Nan ray direction in diffuse material
+- [x] Material Lights

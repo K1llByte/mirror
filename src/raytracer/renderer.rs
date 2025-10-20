@@ -29,25 +29,26 @@ impl Renderer {
     pub fn new(pt: PeerTable) -> Self {
         Self {
             peer_table: pt,
-            max_bounces: 10,
+            max_bounces: 50,
         }
     }
 
     pub fn trace(&self, scene: &Scene, ray: &Ray, depth: usize) -> Vec3 {
         // Depth is the maximum number of recursive ray bounces possible
         if depth == 0 {
-            return Vec3::new(0.0, 0.0, 0.0);
+            return Vec3::ZERO;
         }
 
-        if let Some(hit) = scene.hit(&ray) {
-            if let Some(scattered) = hit.material.scatter(ray, &hit) {
-                return scattered.attenuation * self.trace(scene, &scattered.ray, depth - 1);
-            }
-            return Vec3::new(0.2, 0.2, 0.2);
-        }
+        let Some(hit) = scene.hit(&ray) else {
+            return scene.background();
+        };
 
-        let a = 0.5 * (ray.direction().normalize().y + 1.0);
-        (1.0 - a) * Vec3::new(1.0, 1.0, 1.0) + a * Vec3::new(0.5, 0.7, 1.0)
+        let Some(scattered) = hit.material.scatter(ray, &hit) else {
+            return hit.material.emission();
+        };
+
+        let scattering = scattered.attenuation * self.trace(scene, &scattered.ray, depth - 1);
+        scattering + hit.material.emission()
     }
 
     pub fn render_tile(
