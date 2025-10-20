@@ -1,12 +1,11 @@
 # In Progress
-- [ ] Cuboid 
+- [ ] Cuboid
 
 # Todo
 ## Simple path tracer - v1.0
 - [ ] Lights
 - [ ] Volumes
 - [ ] Textures
-- [ ] connect_to_peers methods should connect to all at the same time
 - [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
 - [ ] Benchmark (single task vs multi task vs multi task and remote nodes)
@@ -30,6 +29,7 @@ with the node via websockets.
 - Meshes
 
 ## Unsorted
+- [ ] connect_to_peers methods should connect to all at the same time
 - [ ] FIXME: Hardcoded 127.0.0.1 for now, will change this to a Hello handshake returning an id
 - [ ] Github CI workflows
     - [ ] Create a dev branch and always active work there
@@ -94,3 +94,4 @@ to work on it
     since intersection with aabb's will early return for far away boxes)
     - [x] Use comparison axis with longest extent of node aabb
 - [x] Quads
+- [x] Fix Nan ray direction in diffuse material

@@ -32,12 +32,15 @@ impl Material {
 
         match self {
             Self::Diffuse { albedo } => {
-                let direction = hit.normal + utils::random_vector(&mut rng);
+                let rnd_dir = utils::random_vector(&mut rng);
+                let mut direction = (hit.normal + rnd_dir).normalize();
 
-                // TODO: Check if direction is not near 0
+                if direction.is_nan() {
+                    direction = hit.normal
+                }
 
                 Some(ScatteredRay {
-                    ray: Ray::new(hit.position, direction.normalize()),
+                    ray: Ray::new(hit.position, direction),
                     attenuation: *albedo,
                 })
             }
