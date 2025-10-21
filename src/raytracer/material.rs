@@ -54,7 +54,6 @@ impl Material {
                 let mut scattered_dir =
                     (reflected_dir + *fuzzyness * utils::random_vector(&mut rng)).normalize();
                 if scattered_dir.is_nan() {
-                    println!("Its the metalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                     scattered_dir = reflected_dir;
                 }
 

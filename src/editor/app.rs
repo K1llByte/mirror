@@ -1,8 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
+use chrono::Local;
 use eframe::egui::{self, Color32, ColorImage, DragValue, Key, TextureHandle, Ui, load::Bytes};
 use egui_extras::{Column, TableBuilder};
 use glam::Vec3;
+use image::{ImageBuffer, RgbImage};
 use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
 
 use crate::raytracer::{self, AccumulatedImage, Renderer, Scene};
@@ -137,6 +139,20 @@ impl MirrorApp {
                 });
         }
     }
+
+    fn save_render_image(&self, path: &str) {
+        let render_image_guard = self.render_image.blocking_read();
+        let (width, height) = render_image_guard.size();
+
+        let img: RgbImage = ImageBuffer::from_raw(
+            width as u32,
+            height as u32,
+            render_image_guard.to_bytes().to_vec(),
+        )
+        .expect("Failed to create image buffer");
+
+        img.save(path).expect("Couldn't save render image file");
+    }
 }
 
 impl eframe::App for MirrorApp {
@@ -170,6 +186,7 @@ impl eframe::App for MirrorApp {
                     .render_join_handle
                     .as_ref()
                     .is_some_and(|fut| !fut.is_finished());
+                // Render button
                 let render_button = ui.add_enabled(!is_rendering, |ui: &mut Ui| {
                     // Framebuffer size Slider
                     ui.horizontal(|ui| {
@@ -204,40 +221,48 @@ impl eframe::App for MirrorApp {
                         }),
                     )
                 });
+                if render_button.clicked() {
+                    self.spawn_render_task();
+                }
 
+                // Stop button
                 let stop_button = ui.add_enabled(is_rendering, |ui: &mut Ui| {
                     ui.add_sized(
                         [ui.available_width(), 30.0],
                         egui::Button::new("Stop").fill(Color32::from_rgb(100, 40, 40)),
                     )
                 });
-
                 if stop_button.clicked() {
                     if let Some(join_handle) = &self.render_join_handle {
                         join_handle.abort();
                     }
                     self.render_join_handle = None;
-                }
-
-                if render_button.clicked() {
-                    self.spawn_render_task();
+                    // TODO: Cancel child tasks
                 }
 
                 // Clear Button
                 let clear_button =
                     ui.add_sized([ui.available_width(), 0.0], egui::Button::new("Clear"));
                 if clear_button.clicked() {
-                    if let Some(render_join_handle) = &self.render_join_handle {
-                        render_join_handle.abort();
-                        self.render_join_handle = None;
-                    }
-                    let clear_value = 20.0 / 255.0;
-                    self.render_image.blocking_write().clear(Vec3::new(
-                        clear_value,
-                        clear_value,
-                        clear_value,
-                    ));
-                    self.present_framebuffer = true;
+                    // if let Some(render_join_handle) = &self.render_join_handle {
+                    //     render_join_handle.abort();
+                    //     self.render_join_handle = None;
+                    // }
+                    // let clear_value = 20.0 / 255.0;
+                    // self.render_image.blocking_write().clear(Vec3::new(
+                    //     clear_value,
+                    //     clear_value,
+                    //     clear_value,
+                    // ));
+                    // self.present_framebuffer = true;
+                }
+
+                let save_image_button =
+                    ui.add_sized([ui.available_width(), 0.0], egui::Button::new("Save Image"));
+                if save_image_button.clicked() {
+                    self.save_render_image(
+                        format!("render_{}.png", Local::now().format("%Y%m%d_%H%M%S")).as_str(),
+                    );
                 }
             });
         }

@@ -264,7 +264,7 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
     });
     let metal_mat = Arc::new(Material::Metalic {
         albedo: Vec3::new(0.8, 0.65, 0.7),
-        fuzzyness: 0.0,
+        fuzzyness: 0.2,
     });
     let glass_mat = Arc::new(Material::Dielectric {
         refraction_index: 1.5,
