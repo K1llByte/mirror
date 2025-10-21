@@ -15,9 +15,6 @@ impl Ray {
     pub const MAX_RAY_DISTANCE: f32 = f32::MAX;
 
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
-        if !direction.is_normalized() {
-            println!("direction: {}", direction);
-        }
         assert!(
             direction.is_normalized(),
             "Ray direction must be normalized"

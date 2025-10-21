@@ -1,9 +1,10 @@
 # In Progress
-- [x] Cornell box scene
 - [ ] Cuboid
 
 # Todo
 ## Simple path tracer - v1.0
+- [ ] Fix if nan then choose a vector in materials
+- [ ] Fix problem that when sample count is low (1 sample) the light seems to be darker
 - [ ] Fix non rendering face of geometry is rendering as opaque color
 - [ ] Transform
     - [ ] Translation
@@ -14,6 +15,11 @@
 - [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
 - [ ] Benchmark (single task vs multi task vs multi task and remote nodes)
+
+- [ ] Button to save rendered image to file
+- [ ] Button to stop current render task
+- [ ] Render info (how many samples, render time)
+
 - [ ] Documentation:
   - [ ] Update README.md with: What it is, What technologies uses, How to use,
   how it works, references and documentation
@@ -47,7 +53,6 @@ with the node via websockets.
     - [ ] CI that builds a gh-pages branch that deploys webassembly generated project to the web
 - [ ] PeerTable should store peer data as Arc<Mutex<Peer>> instead of current approach
 - [ ] Implement some image denoising algorithm such as bilateral filter
-- [ ] Button to save rendered image to file
 
 ____________________________________________________________________________________
 
@@ -105,3 +110,4 @@ to work on it
 - [x] Quads
 - [x] Fix Nan ray direction in diffuse material
 - [x] Material Lights
+- [x] Cornell box scene

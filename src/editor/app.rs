@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use eframe::egui::{self, ColorImage, DragValue, Key, TextureHandle, Ui, load::Bytes};
+use eframe::egui::{self, Color32, ColorImage, DragValue, Key, TextureHandle, Ui, load::Bytes};
 use egui_extras::{Column, TableBuilder};
 use glam::Vec3;
 use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
@@ -162,6 +162,7 @@ impl eframe::App for MirrorApp {
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
                 ui.heading("Mirror");
                 ui.separator();
+
                 self.show_connected_peers(ui);
                 ui.separator();
 
@@ -204,12 +205,19 @@ impl eframe::App for MirrorApp {
                     )
                 });
 
-                // let stop_button = ui.add_enabled(is_rendering, |ui: &mut Ui| {
-                //     ui.add_sized(
-                //         [ui.available_width(), 30.0],
-                //         egui::Button::new("Stop").fill(Color32::from_rgb(100, 40, 40)),
-                //     )
-                // });
+                let stop_button = ui.add_enabled(is_rendering, |ui: &mut Ui| {
+                    ui.add_sized(
+                        [ui.available_width(), 30.0],
+                        egui::Button::new("Stop").fill(Color32::from_rgb(100, 40, 40)),
+                    )
+                });
+
+                if stop_button.clicked() {
+                    if let Some(join_handle) = &self.render_join_handle {
+                        join_handle.abort();
+                    }
+                    self.render_join_handle = None;
+                }
 
                 if render_button.clicked() {
                     self.spawn_render_task();

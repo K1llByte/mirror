@@ -262,6 +262,13 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
     let light_mat = Arc::new(Material::DiffuseLight {
         emission: Vec3::new(15.0, 15.0, 15.0),
     });
+    let metal_mat = Arc::new(Material::Metalic {
+        albedo: Vec3::new(0.8, 0.65, 0.7),
+        fuzzyness: 0.0,
+    });
+    let glass_mat = Arc::new(Material::Dielectric {
+        refraction_index: 1.5,
+    });
 
     objects.push(Arc::new(Model::new(
         Geometry::Quad {
@@ -302,6 +309,24 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
             v: Vec3::new(555.0, 0.0, 0.0),
         },
         white_mat.clone(),
+    )));
+
+    // Glass sphere
+    objects.push(Arc::new(Model::new(
+        Geometry::Sphere {
+            position: Vec3::new(405.0, 100.0, 240.0),
+            radius: 100.0,
+        },
+        glass_mat.clone(),
+    )));
+
+    // Metal sphere
+    objects.push(Arc::new(Model::new(
+        Geometry::Sphere {
+            position: Vec3::new(150.0, 100.0, 360.0),
+            radius: 100.0,
+        },
+        metal_mat.clone(),
     )));
 
     // Light

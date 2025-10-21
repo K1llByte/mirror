@@ -110,6 +110,7 @@ async fn local_render_tile_task(
         (image_render_guard.size(), image_render_guard.times_sampled)
     };
     loop {
+        // warn!("Still aliveeeeeeeeeee");
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work

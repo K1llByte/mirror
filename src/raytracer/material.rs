@@ -41,7 +41,7 @@ impl Material {
                 let mut direction = (hit.normal + rnd_dir).normalize();
 
                 if direction.is_nan() {
-                    direction = hit.normal
+                    direction = hit.normal;
                 }
 
                 Some(ScatteredRay {
@@ -51,10 +51,14 @@ impl Material {
             }
             Self::Metalic { albedo, fuzzyness } => {
                 let reflected_dir = ray.direction().reflect(hit.normal).normalize();
-                let scattered_ray = Ray::new(
-                    hit.position,
-                    (reflected_dir + *fuzzyness * utils::random_vector(&mut rng)).normalize(),
-                );
+                let mut scattered_dir =
+                    (reflected_dir + *fuzzyness * utils::random_vector(&mut rng)).normalize();
+                if scattered_dir.is_nan() {
+                    println!("Its the metalic!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    scattered_dir = reflected_dir;
+                }
+
+                let scattered_ray = Ray::new(hit.position, scattered_dir);
                 if scattered_ray.direction().dot(hit.normal) > 0.0 {
                     Some(ScatteredRay {
                         ray: scattered_ray,
@@ -87,9 +91,24 @@ impl Material {
                     || schlick_approximation(cos_theta, real_refraction_index)
                         > rng.random_range(0f32..1f32)
                 {
-                    unit_ray_dir.reflect(hit.normal)
+                    let ray_direction = unit_ray_dir.reflect(hit.normal);
+                    if ray_direction.normalize().is_nan() {
+                        println!(
+                            "Its the dialetric reflection!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                        );
+                    }
+                    ray_direction
                 } else {
-                    unit_ray_dir.refract(hit.normal, real_refraction_index)
+                    let ray_direction = unit_ray_dir.refract(hit.normal, real_refraction_index);
+                    if ray_direction.normalize().is_nan() {
+                        println!(
+                            "Its the dialetric refraction: unit_ray_dir={}, hit.normal={}, ray.direction={} !!",
+                            unit_ray_dir,
+                            hit.normal,
+                            ray.direction()
+                        );
+                    }
+                    ray_direction
                 };
 
                 Some(ScatteredRay {
