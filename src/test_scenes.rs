@@ -329,6 +329,15 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
         metal_mat.clone(),
     )));
 
+    // Metal cuboid
+    // objects.push(Arc::new(Model::new(
+    //     Geometry::Cuboid {
+    //         position: Vec3::new(150.0, 0.0, 360.0),
+    //         size: Vec3::splat(100.0),
+    //     },
+    //     metal_mat.clone(),
+    // )));
+
     // Light
     objects.push(Arc::new(Model::new(
         Geometry::Quad {

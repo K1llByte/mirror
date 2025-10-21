@@ -137,7 +137,65 @@ impl Model {
     }
 
     fn hit_cuboid(&self, ray: &Ray, position: Vec3, size: Vec3) -> Option<Hit> {
-        todo!()
+        let half_size = size / 2.0;
+
+        let front_hit = self.hit_quad(
+            &ray,
+            position - half_size,
+            Vec3::new(0.0, size.y, 0.0),
+            Vec3::new(0.0, 0.0, size.z),
+        );
+        if front_hit.is_some() {
+            debug!("Hit something");
+            return front_hit;
+        }
+        let back_hit = self.hit_quad(
+            &ray,
+            position + half_size,
+            Vec3::new(0.0, 0.0, -size.z),
+            Vec3::new(0.0, -size.y, 0.0),
+        );
+        if back_hit.is_some() {
+            debug!("Hit something");
+            return back_hit;
+        }
+        let right_hit = self.hit_quad(
+            &ray,
+            position - half_size,
+            Vec3::new(-size.x, 0.0, 0.0),
+            Vec3::new(0.0, size.y, 0.0),
+        );
+        if right_hit.is_some() {
+            debug!("Hit something");
+            return right_hit;
+        }
+        let left_hit = self.hit_quad(
+            &ray,
+            position + half_size,
+            Vec3::new(0.0, -size.y, 0.0),
+            Vec3::new(size.x, 0.0, 0.0),
+        );
+        if left_hit.is_some() {
+            debug!("Hit something");
+            return left_hit;
+        }
+        let upper_hit = self.hit_quad(
+            &ray,
+            position - half_size,
+            Vec3::new(0.0, 0.0, size.z),
+            Vec3::new(-size.x, 0.0, 0.0),
+        );
+        if upper_hit.is_some() {
+            debug!("Hit something");
+            return upper_hit;
+        }
+        let bottom_hit = self.hit_quad(
+            &ray,
+            position + half_size,
+            Vec3::new(0.0, 0.0, -size.z),
+            Vec3::new(size.x, 0.0, 0.0),
+        );
+        bottom_hit
     }
 }
 
@@ -161,9 +219,7 @@ impl Bounded for Model {
                 &Aabb::from_positions(position, position + u + v),
                 &Aabb::from_positions(position + u, position + v),
             ),
-            Geometry::Cuboid { position, size } => {
-                todo!()
-            }
+            Geometry::Cuboid { position, size } => Aabb::new(position, size),
         }
     }
 }

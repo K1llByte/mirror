@@ -1,9 +1,9 @@
 # In Progress
 - [ ] Cuboid
+- [ ] Fix "if nan then choose a vector" in materials
 
 # Todo
 ## Simple path tracer - v1.0
-- [ ] Fix if nan then choose a vector in materials
 - [ ] Fix problem that when sample count is low (1 sample) the light seems to be darker
 - [ ] Fix non rendering face of geometry is rendering as opaque color
 - [ ] Transform
@@ -16,7 +16,6 @@
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
 - [ ] Benchmark (single task vs multi task vs multi task and remote nodes)
 
-- [ ] Button to save rendered image to file
 - [ ] Button to stop current render task
 - [ ] Render info (how many samples, render time)
 
@@ -111,3 +110,4 @@ to work on it
 - [x] Fix Nan ray direction in diffuse material
 - [x] Material Lights
 - [x] Cornell box scene
+- [x] Button to save rendered image to file
