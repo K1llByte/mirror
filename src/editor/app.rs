@@ -29,7 +29,7 @@ pub struct MirrorApp {
 
 impl MirrorApp {
     pub fn new(runtime: Runtime, renderer: Arc<Renderer>, scene: Arc<Scene>) -> Self {
-        let framebuffer_size = (1280, 720);
+        let framebuffer_size = (400, 400);
         Self {
             // Backend data
             runtime,
@@ -42,7 +42,7 @@ impl MirrorApp {
             texture: None,
             render_join_handle: None,
             progressive_rendering: false,
-            samples_per_pixel: 1,
+            samples_per_pixel: 20,
             framebuffer_size,
             cached_peers_info: vec![],
         }

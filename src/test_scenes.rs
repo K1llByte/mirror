@@ -263,7 +263,8 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
         emission: Vec3::new(15.0, 15.0, 15.0),
     });
     let metal_mat = Arc::new(Material::Metalic {
-        albedo: Vec3::new(0.8, 0.65, 0.7),
+        albedo: Vec3::new(1.0, 0.0, 0.0),
+        // albedo: Vec3::new(0.8, 0.65, 0.7),
         fuzzyness: 0.2,
     });
     let glass_mat = Arc::new(Material::Dielectric {
@@ -311,32 +312,83 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
         white_mat.clone(),
     )));
 
-    // Glass sphere
-    objects.push(Arc::new(Model::new(
-        Geometry::Sphere {
-            position: Vec3::new(405.0, 100.0, 240.0),
-            radius: 100.0,
-        },
-        glass_mat.clone(),
-    )));
+    // // Glass sphere
+    // objects.push(Arc::new(Model::new(
+    //     Geometry::Sphere {
+    //         position: Vec3::new(405.0, 100.0, 240.0),
+    //         radius: 100.0,
+    //     },
+    //     glass_mat.clone(),
+    // )));
 
-    // Metal sphere
-    objects.push(Arc::new(Model::new(
-        Geometry::Sphere {
-            position: Vec3::new(150.0, 100.0, 360.0),
-            radius: 100.0,
-        },
-        metal_mat.clone(),
-    )));
+    // // Metal sphere
+    // objects.push(Arc::new(Model::new(
+    //     Geometry::Sphere {
+    //         position: Vec3::new(150.0, 100.0, 360.0),
+    //         radius: 100.0,
+    //     },
+    //     metal_mat.clone(),
+    // )));
 
     // Metal cuboid
     // objects.push(Arc::new(Model::new(
     //     Geometry::Cuboid {
-    //         position: Vec3::new(150.0, 0.0, 360.0),
+    //         position: Vec3::new(150.0, 60.0, 360.0),
     //         size: Vec3::splat(100.0),
     //     },
     //     metal_mat.clone(),
     // )));
+
+    // TEMPORARY:
+    let size = Vec3::splat(100.0);
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(150.0, 60.0, 360.0) - (size / 2.0),
+            u: Vec3::new(0.0, 0.0, size.z),
+            v: Vec3::new(0.0, size.y, 0.0),
+        },
+        metal_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(150.0, 60.0, 360.0) + (size / 2.0),
+            u: Vec3::new(0.0, -size.y, 0.0),
+            v: Vec3::new(0.0, 0.0, -size.z),
+        },
+        metal_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(150.0, 60.0, 360.0) - (size / 2.0),
+            u: Vec3::new(0.0, size.y, 0.0),
+            v: Vec3::new(size.x, 0.0, 0.0),
+        },
+        metal_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(150.0, 60.0, 360.0) + (size / 2.0),
+            u: Vec3::new(-size.x, 0.0, 0.0),
+            v: Vec3::new(0.0, -size.y, 0.0),
+        },
+        metal_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(150.0, 60.0, 360.0) - (size / 2.0),
+            u: Vec3::new(size.x, 0.0, 0.0),
+            v: Vec3::new(0.0, 0.0, size.z),
+        },
+        metal_mat.clone(),
+    )));
+    objects.push(Arc::new(Model::new(
+        Geometry::Quad {
+            position: Vec3::new(150.0, 60.0, 360.0) + (size / 2.0),
+            u: Vec3::new(0.0, 0.0, -size.z),
+            v: Vec3::new(-size.x, 0.0, 0.0),
+        },
+        metal_mat.clone(),
+    )));
 
     // Light
     objects.push(Arc::new(Model::new(

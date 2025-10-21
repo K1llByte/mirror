@@ -139,63 +139,61 @@ impl Model {
     fn hit_cuboid(&self, ray: &Ray, position: Vec3, size: Vec3) -> Option<Hit> {
         let half_size = size / 2.0;
 
-        let front_hit = self.hit_quad(
-            &ray,
-            position - half_size,
-            Vec3::new(0.0, size.y, 0.0),
-            Vec3::new(0.0, 0.0, size.z),
-        );
-        if front_hit.is_some() {
-            debug!("Hit something");
-            return front_hit;
-        }
-        let back_hit = self.hit_quad(
-            &ray,
-            position + half_size,
-            Vec3::new(0.0, 0.0, -size.z),
-            Vec3::new(0.0, -size.y, 0.0),
-        );
-        if back_hit.is_some() {
-            debug!("Hit something");
-            return back_hit;
-        }
-        let right_hit = self.hit_quad(
-            &ray,
-            position - half_size,
-            Vec3::new(-size.x, 0.0, 0.0),
-            Vec3::new(0.0, size.y, 0.0),
-        );
-        if right_hit.is_some() {
-            debug!("Hit something");
-            return right_hit;
-        }
-        let left_hit = self.hit_quad(
-            &ray,
-            position + half_size,
-            Vec3::new(0.0, -size.y, 0.0),
-            Vec3::new(size.x, 0.0, 0.0),
-        );
-        if left_hit.is_some() {
-            debug!("Hit something");
-            return left_hit;
-        }
-        let upper_hit = self.hit_quad(
+        let pos_x_hit = self.hit_quad(
             &ray,
             position - half_size,
             Vec3::new(0.0, 0.0, size.z),
-            Vec3::new(-size.x, 0.0, 0.0),
+            Vec3::new(0.0, size.y, 0.0),
         );
-        if upper_hit.is_some() {
-            debug!("Hit something");
-            return upper_hit;
+        if pos_x_hit.is_some() {
+            return pos_x_hit;
         }
-        let bottom_hit = self.hit_quad(
+        let neg_x_hit = self.hit_quad(
+            &ray,
+            position + half_size,
+            Vec3::new(0.0, -size.y, 0.0),
+            Vec3::new(0.0, 0.0, -size.z),
+        );
+        if neg_x_hit.is_some() {
+            return neg_x_hit;
+        }
+        let neg_z_hit = self.hit_quad(
+            &ray,
+            position - half_size,
+            Vec3::new(0.0, size.y, 0.0),
+            Vec3::new(size.x, 0.0, 0.0),
+        );
+        if neg_z_hit.is_some() {
+            return neg_z_hit;
+        }
+        let pos_z_hit = self.hit_quad(
+            &ray,
+            position + half_size,
+            Vec3::new(-size.x, 0.0, 0.0),
+            Vec3::new(0.0, -size.y, 0.0),
+        );
+        if pos_z_hit.is_some() {
+            return pos_z_hit;
+        }
+        let neg_y_hit = self.hit_quad(
+            &ray,
+            position - half_size,
+            Vec3::new(size.x, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, size.z),
+        );
+        if neg_y_hit.is_some() {
+            return neg_y_hit;
+        }
+        let pos_y_hit = self.hit_quad(
             &ray,
             position + half_size,
             Vec3::new(0.0, 0.0, -size.z),
-            Vec3::new(size.x, 0.0, 0.0),
+            Vec3::new(-size.x, 0.0, 0.0),
         );
-        bottom_hit
+        if pos_y_hit.is_some() {
+            return pos_y_hit;
+        }
+        None
     }
 }
 
@@ -219,7 +217,8 @@ impl Bounded for Model {
                 &Aabb::from_positions(position, position + u + v),
                 &Aabb::from_positions(position + u, position + v),
             ),
-            Geometry::Cuboid { position, size } => Aabb::new(position, size),
+            // FIXME: Maybe padding is not necessary
+            Geometry::Cuboid { position, size } => Aabb::new(position, size + Vec3::splat(0.1)),
         }
     }
 }
