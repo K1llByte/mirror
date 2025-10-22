@@ -233,10 +233,10 @@ impl eframe::App for MirrorApp {
                     )
                 });
                 if stop_button.clicked() {
-                    if let Some(join_handle) = &self.render_join_handle {
-                        join_handle.abort();
-                    }
-                    self.render_join_handle = None;
+                    // if let Some(join_handle) = &self.render_join_handle {
+                    //     join_handle.abort();
+                    // }
+                    // self.render_join_handle = None;
                     // TODO: Cancel child tasks
                 }
 

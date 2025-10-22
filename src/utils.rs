@@ -26,21 +26,6 @@ pub fn spherical_to_cartesian(v: Vec3) -> Vec3 {
 }
 
 /// Return a normalized random vector
-// pub fn random_vector(rng: &mut impl Rng) -> Vec3 {
-//     loop {
-//         let p = Vec3::new(
-//             rng.random_range(-1.0..1.0),
-//             rng.random_range(-1.0..1.0),
-//             rng.random_range(-1.0..1.0),
-//         );
-//         let lensq = p.length_squared();
-//         if f32::MIN_POSITIVE < lensq && lensq <= 1.0 {
-//             return p / lensq.sqrt();
-//         }
-//     }
-// }
-
-/// Return a normalized random vector
 pub fn random_vector(rng: &mut impl Rng) -> Vec3 {
     let polar = rng.random_range(0.0..std::f32::consts::PI);
     let azimuth = rng.random_range(0.0..(2.0 * std::f32::consts::PI));

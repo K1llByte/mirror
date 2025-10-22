@@ -191,16 +191,11 @@ async fn remote_render_tile_task(
             // Do work
             let tile = {
                 let roundtrip_timer = Instant::now();
-                let lock_wait_timer = Instant::now();
                 let tile_recv_queue = {
                     let mut peer_table_guard = renderer.peer_table.write().await;
                     let peer = peer_table_guard
                         .get_mut(&peer_listen_address)
                         .expect("Peer data should exist");
-                    // trace!(
-                    //     "Time waiting for write lock: {} ms",
-                    //     lock_wait_timer.elapsed().as_millis()
-                    // );
                     // Send render request
                     if let Err(_) = (MirrorPacket::RenderTileRequest {
                         begin_pos: tile_render_work.begin_pos,
@@ -295,9 +290,6 @@ pub async fn render_task(
 
     let (work_send_queue, work_recv_queue) = async_channel::unbounded::<TileRenderWork>();
 
-    // let num_local_tasks = thread::available_parallelism()
-    //     .map(NonZero::get)
-    //     .unwrap_or(1);
     let num_remote_tasks = renderer.peer_table.read().await.len();
     let num_processors = thread::available_parallelism()
         .map(NonZero::get)
