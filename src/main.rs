@@ -84,7 +84,8 @@ fn main() -> anyhow::Result<()> {
     let scene = Arc::new({
         let aspect_ratio = 16.0 / 9.0;
         match args.scene.as_deref() {
-            Some("cornell") => cornell_scene(aspect_ratio),
+            Some("cornell2") => cornell_box2_scene(aspect_ratio),
+            Some("cornell") => cornell_box_scene(aspect_ratio),
             Some("spheres") => spheres_scene(aspect_ratio),
             Some("spheres2") => spheres2_scene(aspect_ratio),
             Some("quads") => quads_scene(aspect_ratio),

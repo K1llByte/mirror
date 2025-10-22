@@ -247,7 +247,7 @@ pub fn quads_scene(cam_aspect_ratio: f32) -> Scene {
     )
 }
 
-pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
+fn empty_cornell_box() -> Vec<Arc<Model>> {
     let mut objects = Vec::new();
 
     let red_mat = Arc::new(Material::Diffuse {
@@ -263,8 +263,7 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
         emission: Vec3::new(15.0, 15.0, 15.0),
     });
     let metal_mat = Arc::new(Material::Metalic {
-        albedo: Vec3::new(1.0, 0.0, 0.0),
-        // albedo: Vec3::new(0.8, 0.65, 0.7),
+        albedo: Vec3::new(0.8, 0.65, 0.7),
         fuzzyness: 0.2,
     });
     let glass_mat = Arc::new(Material::Dielectric {
@@ -312,84 +311,6 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
         white_mat.clone(),
     )));
 
-    // // Glass sphere
-    // objects.push(Arc::new(Model::new(
-    //     Geometry::Sphere {
-    //         position: Vec3::new(405.0, 100.0, 240.0),
-    //         radius: 100.0,
-    //     },
-    //     glass_mat.clone(),
-    // )));
-
-    // // Metal sphere
-    // objects.push(Arc::new(Model::new(
-    //     Geometry::Sphere {
-    //         position: Vec3::new(150.0, 100.0, 360.0),
-    //         radius: 100.0,
-    //     },
-    //     metal_mat.clone(),
-    // )));
-
-    // Metal cuboid
-    // objects.push(Arc::new(Model::new(
-    //     Geometry::Cuboid {
-    //         position: Vec3::new(150.0, 60.0, 360.0),
-    //         size: Vec3::splat(100.0),
-    //     },
-    //     metal_mat.clone(),
-    // )));
-
-    // TEMPORARY:
-    let size = Vec3::splat(100.0);
-    objects.push(Arc::new(Model::new(
-        Geometry::Quad {
-            position: Vec3::new(150.0, 60.0, 360.0) - (size / 2.0),
-            u: Vec3::new(0.0, 0.0, size.z),
-            v: Vec3::new(0.0, size.y, 0.0),
-        },
-        metal_mat.clone(),
-    )));
-    objects.push(Arc::new(Model::new(
-        Geometry::Quad {
-            position: Vec3::new(150.0, 60.0, 360.0) + (size / 2.0),
-            u: Vec3::new(0.0, -size.y, 0.0),
-            v: Vec3::new(0.0, 0.0, -size.z),
-        },
-        metal_mat.clone(),
-    )));
-    objects.push(Arc::new(Model::new(
-        Geometry::Quad {
-            position: Vec3::new(150.0, 60.0, 360.0) - (size / 2.0),
-            u: Vec3::new(0.0, size.y, 0.0),
-            v: Vec3::new(size.x, 0.0, 0.0),
-        },
-        metal_mat.clone(),
-    )));
-    objects.push(Arc::new(Model::new(
-        Geometry::Quad {
-            position: Vec3::new(150.0, 60.0, 360.0) + (size / 2.0),
-            u: Vec3::new(-size.x, 0.0, 0.0),
-            v: Vec3::new(0.0, -size.y, 0.0),
-        },
-        metal_mat.clone(),
-    )));
-    objects.push(Arc::new(Model::new(
-        Geometry::Quad {
-            position: Vec3::new(150.0, 60.0, 360.0) - (size / 2.0),
-            u: Vec3::new(size.x, 0.0, 0.0),
-            v: Vec3::new(0.0, 0.0, size.z),
-        },
-        metal_mat.clone(),
-    )));
-    objects.push(Arc::new(Model::new(
-        Geometry::Quad {
-            position: Vec3::new(150.0, 60.0, 360.0) + (size / 2.0),
-            u: Vec3::new(0.0, 0.0, -size.z),
-            v: Vec3::new(-size.x, 0.0, 0.0),
-        },
-        metal_mat.clone(),
-    )));
-
     // Light
     objects.push(Arc::new(Model::new(
         Geometry::Quad {
@@ -398,6 +319,36 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
             v: Vec3::new(0.0, 0.0, -105.0),
         },
         light_mat.clone(),
+    )));
+
+    objects
+}
+
+pub fn cornell_box_scene(cam_aspect_ratio: f32) -> Scene {
+    let mut objects = empty_cornell_box();
+
+    let white_mat = Arc::new(Material::Diffuse {
+        albedo: Vec3::new(0.73, 0.73, 0.73),
+    });
+    let glass_mat = Arc::new(Material::Dielectric {
+        refraction_index: 1.5,
+    });
+
+    // Cuboid 1
+    objects.push(Arc::new(Model::new(
+        Geometry::Cuboid {
+            position: Vec3::new(212.5, 165.0 / 2.0, 147.5),
+            size: Vec3::new(165.0, 165.0, 165.0),
+        },
+        glass_mat.clone(),
+    )));
+    // Cuboid 2
+    objects.push(Arc::new(Model::new(
+        Geometry::Cuboid {
+            position: Vec3::new(347.5, 330.0 / 2.0, 377.5),
+            size: Vec3::new(165.0, 330.0, 165.0),
+        },
+        white_mat.clone(),
     )));
 
     Scene::with_background(
@@ -409,7 +360,48 @@ pub fn cornell_scene(cam_aspect_ratio: f32) -> Scene {
             1.0, //cam_aspect_ratio,
         ),
         objects,
-        // Vec3::new(0.70, 0.80, 1.00),
+        Vec3::new(0.0, 0.0, 0.0),
+    )
+}
+
+pub fn cornell_box2_scene(cam_aspect_ratio: f32) -> Scene {
+    let mut objects = empty_cornell_box();
+
+    let metal_mat = Arc::new(Material::Metalic {
+        albedo: Vec3::new(0.8, 0.65, 0.7),
+        fuzzyness: 0.2,
+    });
+    let glass_mat = Arc::new(Material::Dielectric {
+        refraction_index: 1.5,
+    });
+
+    // Glass sphere
+    objects.push(Arc::new(Model::new(
+        Geometry::Sphere {
+            position: Vec3::new(405.0, 100.0, 240.0),
+            radius: 100.0,
+        },
+        glass_mat.clone(),
+    )));
+
+    // Metal sphere
+    objects.push(Arc::new(Model::new(
+        Geometry::Sphere {
+            position: Vec3::new(150.0, 100.0, 360.0),
+            radius: 100.0,
+        },
+        metal_mat.clone(),
+    )));
+
+    Scene::with_background(
+        Camera::new(
+            Vec3::new(278.0, 278.0, -800.0),
+            Vec3::new(0.0, 0.0, 1.0).normalize(),
+            Vec3::new(0.0, -1.0, 0.0).normalize(),
+            40.0,
+            1.0, //cam_aspect_ratio,
+        ),
+        objects,
         Vec3::new(0.0, 0.0, 0.0),
     )
 }

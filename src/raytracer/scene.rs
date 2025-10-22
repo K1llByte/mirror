@@ -138,6 +138,8 @@ impl Model {
 
     fn hit_cuboid(&self, ray: &Ray, position: Vec3, size: Vec3) -> Option<Hit> {
         let half_size = size / 2.0;
+        let mut closest_hit_distance = ray.tmax();
+        let mut closest_hit = None;
 
         let pos_x_hit = self.hit_quad(
             &ray,
@@ -145,55 +147,49 @@ impl Model {
             Vec3::new(0.0, 0.0, size.z),
             Vec3::new(0.0, size.y, 0.0),
         );
-        if pos_x_hit.is_some() {
-            return pos_x_hit;
-        }
         let neg_x_hit = self.hit_quad(
             &ray,
             position + half_size,
             Vec3::new(0.0, -size.y, 0.0),
             Vec3::new(0.0, 0.0, -size.z),
         );
-        if neg_x_hit.is_some() {
-            return neg_x_hit;
-        }
         let neg_z_hit = self.hit_quad(
             &ray,
             position - half_size,
             Vec3::new(0.0, size.y, 0.0),
             Vec3::new(size.x, 0.0, 0.0),
         );
-        if neg_z_hit.is_some() {
-            return neg_z_hit;
-        }
         let pos_z_hit = self.hit_quad(
             &ray,
             position + half_size,
             Vec3::new(-size.x, 0.0, 0.0),
             Vec3::new(0.0, -size.y, 0.0),
         );
-        if pos_z_hit.is_some() {
-            return pos_z_hit;
-        }
         let neg_y_hit = self.hit_quad(
             &ray,
             position - half_size,
             Vec3::new(size.x, 0.0, 0.0),
             Vec3::new(0.0, 0.0, size.z),
         );
-        if neg_y_hit.is_some() {
-            return neg_y_hit;
-        }
         let pos_y_hit = self.hit_quad(
             &ray,
             position + half_size,
             Vec3::new(0.0, 0.0, -size.z),
             Vec3::new(-size.x, 0.0, 0.0),
         );
-        if pos_y_hit.is_some() {
-            return pos_y_hit;
+        let quads_hits = [
+            pos_x_hit, neg_x_hit, pos_z_hit, neg_z_hit, pos_y_hit, neg_y_hit,
+        ];
+        for quad_hit in quads_hits {
+            if let Some(hit) = quad_hit {
+                if hit.distance < closest_hit_distance {
+                    closest_hit_distance = hit.distance;
+                    closest_hit = Some(hit);
+                }
+            }
         }
-        None
+
+        closest_hit
     }
 }
 
@@ -217,8 +213,7 @@ impl Bounded for Model {
                 &Aabb::from_positions(position, position + u + v),
                 &Aabb::from_positions(position + u, position + v),
             ),
-            // FIXME: Maybe padding is not necessary
-            Geometry::Cuboid { position, size } => Aabb::new(position, size + Vec3::splat(0.1)),
+            Geometry::Cuboid { position, size } => Aabb::new(position, size),
         }
     }
 }

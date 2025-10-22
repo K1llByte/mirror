@@ -35,7 +35,6 @@ with the node via websockets.
 - Scheduler that considers node latency and performance score
 - Scheduler that distributes workload based on local performance
 
-
 ## Improved path tracer
 - Explore new BRDF models (Burley, Oren nayar, Chan, Callisto, GGX, Trowbridge-Reitz)
 - Diff-based scene update/synchronization between nodes
