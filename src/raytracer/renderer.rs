@@ -10,14 +10,14 @@ use std::{
     time::Instant,
 };
 
-use async_channel::{Receiver, Sender};
+use async_channel::{Receiver, Sender, TryRecvError};
 use futures::future;
 use glam::Vec3;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::protocol::{MirrorPacket, PeerTable};
+use crate::protocol::{MirrorPacket, PeerTable, TileRenderWork};
 use crate::raytracer::{AccumulatedImage, Hittable, Ray, Scene, Tile};
 
 pub struct Renderer {
@@ -88,11 +88,6 @@ impl Renderer {
     }
 }
 
-struct TileRenderWork {
-    pub begin_pos: (usize, usize),
-    pub tile_size: (usize, usize),
-}
-
 async fn local_render_tile_task(
     work_send_queue: Sender<TileRenderWork>,
     work_recv_queue: Receiver<TileRenderWork>,
@@ -156,6 +151,8 @@ async fn remote_render_tile_task(
     peer_listen_address: SocketAddr,
     samples_per_pixel: usize,
 ) {
+    let render_batch_size: usize = 8;
+    let mut render_batch = Vec::with_capacity(render_batch_size);
     let mut accum_roudtrip_time: u128 = 0;
     let mut accum_rendering_time: u128 = 0;
 
@@ -168,7 +165,6 @@ async fn remote_render_tile_task(
 
     // Synchronize scene before requesting to render tiles
     {
-        let timer = Instant::now();
         let mut peer_table_guard = renderer.peer_table.write().await;
         let peer = peer_table_guard
             .get_mut(&peer_listen_address)
@@ -181,15 +177,24 @@ async fn remote_render_tile_task(
             error!("Remote work task failed to send render tile work");
             return;
         }
-        trace!("Time sending scene: {} ms", timer.elapsed().as_millis());
     }
 
     // Do render work until there's no more
-    loop {
+    'outer: loop {
         // Receive work
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
+            render_batch.push(tile_render_work);
+            // Drain up to render_batch_size-1 additional items without waiting.
+            while render_batch.len() < render_batch_size {
+                match work_recv_queue.try_recv() {
+                    Ok(work) => render_batch.push(work),
+                    Err(TryRecvError::Closed) => break 'outer,
+                    Err(TryRecvError::Empty) => break,
+                }
+            }
+
             // Do work
-            let tile = {
+            let tiles = {
                 let roundtrip_timer = Instant::now();
                 let tile_recv_queue = {
                     let mut peer_table_guard = renderer.peer_table.write().await;
@@ -197,9 +202,9 @@ async fn remote_render_tile_task(
                         .get_mut(&peer_listen_address)
                         .expect("Peer data should exist");
                     // Send render request
+                    trace!("Sending a render batch with {} tiles", render_batch.len());
                     if let Err(_) = (MirrorPacket::RenderTileRequest {
-                        begin_pos: tile_render_work.begin_pos,
-                        tile_size: tile_render_work.tile_size,
+                        tiles: render_batch.clone(),
                         image_size,
                         samples_per_pixel,
                     })
@@ -207,7 +212,10 @@ async fn remote_render_tile_task(
                     .await
                     {
                         error!("Remote work task failed to send render tile work");
-                        work_send_queue.send(tile_render_work).await.unwrap();
+                        // Reinsert work back into the channel
+                        for work in render_batch.iter() {
+                            work_send_queue.send(work.clone()).await.unwrap();
+                        }
                         break;
                     }
                     // trace!("Time sending request: {} ms", timer.elapsed().as_millis());
@@ -215,11 +223,14 @@ async fn remote_render_tile_task(
                 };
 
                 // Receive render response
-                let (tile, render_time) = match tile_recv_queue.recv().await {
-                    Ok(tile) => tile,
+                let (tiles, render_time) = match tile_recv_queue.recv().await {
+                    Ok(response) => response,
                     Err(_) => {
                         error!("Unexpected receiver queue error");
-                        work_send_queue.send(tile_render_work).await.unwrap();
+                        // Reinsert work back into the channel
+                        for work in render_batch.iter() {
+                            work_send_queue.send(work.clone()).await.unwrap();
+                        }
                         break;
                     }
                 };
@@ -227,16 +238,21 @@ async fn remote_render_tile_task(
                 let roundtrip_time = roundtrip_timer.elapsed().as_millis();
                 accum_rendering_time += render_time;
                 accum_roudtrip_time += roundtrip_time;
-                tile
+                tiles
             };
 
-            rendered_tiles.push((tile_render_work.begin_pos, tile));
+            for (work, tile) in render_batch.iter().zip(tiles) {
+                rendered_tiles.push((work.begin_pos, tile));
+            }
 
             // Decrement number of remainder tiles to be rendered and close
             // channel so other tasks can finish and join.
-            if remaining_tiles.fetch_sub(1, atomic::Ordering::Relaxed) <= 1 {
+            if remaining_tiles.fetch_sub(render_batch.len(), atomic::Ordering::Relaxed)
+                <= render_batch.len()
+            {
                 work_send_queue.close();
             }
+            render_batch.clear();
         } else {
             break;
         }

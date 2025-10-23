@@ -22,7 +22,7 @@ pub type PeerTable = Arc<RwLock<HashMap<SocketAddr, Peer>>>;
 pub struct Peer {
     pub name: Option<String>,
     pub write_socket: OwnedWriteHalf,
-    pub tile_recv_queue: Receiver<(Tile, u128)>,
+    pub tile_recv_queue: Receiver<(Vec<Tile>, u128)>,
 }
 
 /// Listen task, responsible for connecting to bootstrap peers and handling new
@@ -178,8 +178,7 @@ pub fn peer_task(
                     scene = Some(received_scene);
                 }
                 Ok(MirrorPacket::RenderTileRequest {
-                    begin_pos,
-                    tile_size,
+                    tiles,
                     image_size,
                     samples_per_pixel,
                 }) => {
@@ -188,29 +187,36 @@ pub fn peer_task(
                         continue;
                     }
                     let timer = Instant::now();
-                    let tile = renderer.render_tile(
-                        scene.as_ref().unwrap(),
-                        samples_per_pixel,
-                        begin_pos,
-                        tile_size,
-                        image_size,
-                    );
+                    assert!(!tiles.is_empty());
+                    let mut tiles_res = Vec::with_capacity(tiles.len());
+                    for tile in tiles {
+                        tiles_res.push(renderer.render_tile(
+                            scene.as_ref().unwrap(),
+                            samples_per_pixel,
+                            tile.begin_pos,
+                            tile.tile_size,
+                            image_size,
+                        ));
+                    }
                     let render_time = timer.elapsed().as_millis();
-                    trace!("RenderTileRequest render time: {render_time} ms",);
+                    trace!("RenderTileRequest render time: {render_time} ms");
 
                     let mut peer_table_guard = renderer.peer_table.write().await;
                     let peer = peer_table_guard
                         .get_mut(&peer_listen_address)
                         .expect("Should be available while this tasks runs");
-                    if let Err(err) = (MirrorPacket::RenderTileResponse { tile, render_time })
-                        .write(&mut peer.write_socket)
-                        .await
+                    if let Err(err) = (MirrorPacket::RenderTileResponse {
+                        tiles: tiles_res,
+                        render_time,
+                    })
+                    .write(&mut peer.write_socket)
+                    .await
                     {
                         error!("Error: {:?}", err);
                     }
                 }
-                Ok(MirrorPacket::RenderTileResponse { tile, render_time }) => {
-                    if let Err(err) = tile_send_queue.send((tile, render_time)).await {
+                Ok(MirrorPacket::RenderTileResponse { tiles, render_time }) => {
+                    if let Err(err) = tile_send_queue.send((tiles, render_time)).await {
                         error!("{err}")
                     }
                 }

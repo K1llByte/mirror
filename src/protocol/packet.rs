@@ -9,6 +9,12 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::raytracer::Scene;
 use crate::raytracer::{Image, Tile};
 
+#[derive(Debug, Clone, Copy, Encode, Decode)]
+pub struct TileRenderWork {
+    pub begin_pos: (usize, usize),
+    pub tile_size: (usize, usize),
+}
+
 /// Represents the main control packet used in the peer-to-peer network.
 #[derive(Debug, Encode, Decode)]
 pub enum MirrorPacket {
@@ -27,14 +33,13 @@ pub enum MirrorPacket {
     /// Tile render request packet type, used to request peer to render tile
     /// packet.
     RenderTileRequest {
-        begin_pos: (usize, usize),
-        tile_size: (usize, usize),
+        tiles: Vec<TileRenderWork>,
         image_size: (usize, usize),
         samples_per_pixel: usize,
     },
     /// Tile render response packet type, response oof the RenderTileRequest
     /// packet type.
-    RenderTileResponse { tile: Tile, render_time: u128 },
+    RenderTileResponse { tiles: Vec<Tile>, render_time: u128 },
 }
 
 #[derive(Debug, Error)]

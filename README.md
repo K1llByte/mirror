@@ -12,3 +12,4 @@ A distributed path tracer using a P2P decentralized overlay network written in r
 - https://raytracing.github.io/books/RayTracingTheRestOfYourLife.html
 - https://pragprog.com/titles/jbtracer/the-ray-tracer-challenge/
 - https://alain.xyz/blog/ray-tracing-denoising
+- https://www.graphics.cornell.edu/online/box/data.html
