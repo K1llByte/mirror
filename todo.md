@@ -1,5 +1,4 @@
 # In Progress
-- [ ] Send multiple tiles to render in the same render tile request packet
     - [ ] Benchmark improvement
 - [ ] On RenderTileRequest, spawn as many tasks as render tipe requests
 - [ ] Fix "if nan then choose a vector" in materials
@@ -111,3 +110,4 @@ to work on it
 - [x] Cornell box scene
 - [x] Button to save rendered image to file
 - [x] Cuboid
+- [x] Send multiple tiles to render in the same render tile request packet
