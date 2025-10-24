@@ -1,8 +1,7 @@
 # In Progress
-    - [ ] Benchmark improvement
 - [ ] On RenderTileRequest, spawn as many tasks as render tipe requests
 - [ ] Fix "if nan then choose a vector" in materials
-- [ ] FIXME: Hardcoded 127.0.0.1 for now, will change this to a Hello handshake returning an id
+- [ ] Fix hardcoded 127.0.0.1, change this to a Hello handshake returning an id
 
 # Todo
 ## Simple path tracer - v1.0

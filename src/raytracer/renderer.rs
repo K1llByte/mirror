@@ -316,7 +316,8 @@ impl Default for RenderInfo {
             total_time: 0,
             last_samples: 0,
             last_time: 0,
-            avg_time_per_sample: 0.0,
+            total_avg_time_per_sample: 0,
+            last_avg_time_per_sample: 0,
         }
     }
 }
