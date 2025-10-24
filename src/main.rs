@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::f32::consts::PI;
 use std::net::SocketAddr;
 use std::num::NonZero;
 use std::sync::Arc;
@@ -7,11 +6,9 @@ use std::thread;
 
 use chrono::Local;
 use clap::Parser;
-use glam::Vec3;
 use mirror::editor;
-use mirror::utils::spherical_to_cartesian;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
 use crate::test_scenes::*;

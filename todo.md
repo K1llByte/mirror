@@ -2,19 +2,21 @@
     - [ ] Benchmark improvement
 - [ ] On RenderTileRequest, spawn as many tasks as render tipe requests
 - [ ] Fix "if nan then choose a vector" in materials
+- [ ] FIXME: Hardcoded 127.0.0.1 for now, will change this to a Hello handshake returning an id
 
 # Todo
 ## Simple path tracer - v1.0
-- [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
+- [ ] Direct light sampling
+- [ ] BSDF refactor
 - [ ] Textures
 - [ ] Transform
     - [ ] Translation
     - [ ] Rotation
     - [ ] Scale
+- [ ] On RenderTileRequest, spawn as many tasks as render tile requests
+- [ ] Each peer sends its max batch size in the Hello handshake packet
 
-- [ ] Button to stop current render task
-- [ ] Render info (how many samples, render time)
 - [ ] Documentation:
   - [ ] Update README.md with: What it is, What technologies uses, How to use,
   how it works, references and documentation
@@ -40,7 +42,7 @@ with the node via websockets.
 
 ## Unsorted
 - [ ] connect_to_peers methods should connect to all at the same time
-- [ ] FIXME: Hardcoded 127.0.0.1 for now, will change this to a Hello handshake returning an id
+
 - [ ] Github CI workflows
     - [ ] Create a dev branch and always active work there
     - [ ] CI that checks unit tests
@@ -50,6 +52,7 @@ with the node via websockets.
 - [ ] Implement some image denoising algorithm such as bilateral filter
 - [ ] Fix problem that when sample count is low (1 sample) the light seems to be darker
 - [ ] Fix non rendering face of geometry is rendering as opaque color when theres no light
+- [ ] When sending scene sync packet avoid cloning whole scene, this will become costly later when theres gigabytes of models loaded
 
 ____________________________________________________________________________________
 
@@ -78,7 +81,6 @@ to work on it
 - [x] Clear button
 - [x] Fix UI update problem when progressive rendering is on
 - [x] Solve blocking show_render_image
-- [x] Solve problem with multithreading not having any performance increase
 - [x] Solve image luminance not working properly, probably due to sample value
 - [x] Solve problem with rendering with remote peers not being better performing
 - [x] Change render_image lock to read write lock
@@ -106,7 +108,7 @@ to work on it
     - [x] Use comparison axis with longest extent of node aabb
 - [x] Quads
 - [x] Fix Nan ray direction in diffuse material
-- [x] Material Lights
+- [x] Material emissive lights
 - [x] Cornell box scene
 - [x] Button to save rendered image to file
 - [x] Cuboid

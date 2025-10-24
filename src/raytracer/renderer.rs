@@ -285,12 +285,48 @@ async fn remote_render_tile_task(
     trace!("Total rendering time {} ms", accum_rendering_time);
 }
 
+/// Render info struct with render timings. Every time value is measured in
+/// milliseconds.
+pub struct RenderInfo {
+    pub total_samples: usize,
+    pub total_time: u128,
+    pub last_samples: usize,
+    pub last_time: u128,
+    pub total_avg_time_per_sample: u128,
+    pub last_avg_time_per_sample: u128,
+}
+
+impl RenderInfo {
+    pub fn merge(&mut self, new: &RenderInfo) {
+        self.total_avg_time_per_sample =
+            (self.total_time + new.total_time) / (self.total_samples + new.total_samples) as u128;
+        self.total_avg_time_per_sample =
+            (self.last_time + new.last_time) / (self.last_samples + new.last_samples) as u128;
+        self.total_samples += new.total_samples;
+        self.total_time += new.total_time;
+        self.last_samples = new.last_samples;
+        self.last_time = new.last_time;
+    }
+}
+
+impl Default for RenderInfo {
+    fn default() -> Self {
+        Self {
+            total_samples: 0,
+            total_time: 0,
+            last_samples: 0,
+            last_time: 0,
+            avg_time_per_sample: 0.0,
+        }
+    }
+}
+
 pub async fn render_task(
     renderer: Arc<Renderer>,
     render_image: Arc<RwLock<AccumulatedImage>>,
     scene: Arc<Scene>,
     samples_per_pixel: usize,
-) {
+) -> RenderInfo {
     // Measure execution time from here
     let render_time = Instant::now();
 
@@ -373,9 +409,19 @@ pub async fn render_task(
     }
 
     // Log render time
+    let render_time = render_time.elapsed().as_millis();
     info!(
         "Rendered {} sample(s) in {} ms",
-        samples_per_pixel,
-        render_time.elapsed().as_millis()
+        samples_per_pixel, render_time
     );
+
+    let total_avg_time_per_sample = render_time / samples_per_pixel as u128;
+    RenderInfo {
+        total_samples: samples_per_pixel,
+        total_time: render_time,
+        last_samples: samples_per_pixel,
+        last_time: render_time,
+        total_avg_time_per_sample,
+        last_avg_time_per_sample: total_avg_time_per_sample,
+    }
 }

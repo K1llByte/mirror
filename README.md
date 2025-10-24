@@ -9,7 +9,11 @@ A distributed path tracer using a P2P decentralized overlay network written in r
 
 - https://raytracing.github.io/books/RayTracingInOneWeekend.html
 - https://raytracing.github.io/books/RayTracingTheNextWeek.html
-- https://raytracing.github.io/books/RayTracingTheRestOfYourLife.html
 - https://pragprog.com/titles/jbtracer/the-ray-tracer-challenge/
 - https://alain.xyz/blog/ray-tracing-denoising
 - https://www.graphics.cornell.edu/online/box/data.html
+
+<!--
+- https://raytracing.github.io/books/RayTracingTheRestOfYourLife.html
+- https://research.nvidia.com/publication/2017-07_interactive-reconstruction-monte-carlo-image-sequences-using-recurrent
+-->
