@@ -86,7 +86,7 @@ fn main() -> anyhow::Result<()> {
             Some("spheres") => spheres_scene(aspect_ratio),
             Some("spheres2") => spheres2_scene(aspect_ratio),
             Some("quads") => quads_scene(aspect_ratio),
-            None => spheres_scene(aspect_ratio),
+            None => cornell_box2_scene(aspect_ratio),
             _ => {
                 tracing::error!("Unkown scene '{}'", args.scene.unwrap());
                 return Ok(());

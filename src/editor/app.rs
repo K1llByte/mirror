@@ -2,7 +2,8 @@ use std::{sync::Arc, time::Duration};
 
 use chrono::Local;
 use eframe::egui::{
-    self, Color32, ColorImage, DragValue, Grid, Key, RichText, TextureHandle, Ui, load::Bytes,
+    self, Color32, ColorImage, DragValue, Grid, Key, Margin, RichText, TextureHandle, Ui,
+    load::Bytes,
 };
 use egui_extras::{Column, TableBuilder};
 use futures::FutureExt;
@@ -323,15 +324,23 @@ impl eframe::App for MirrorApp {
         });
 
         if self.enable_side_panel {
-            egui::SidePanel::left("side_panel").show(ctx, |ui| {
-                self.show_network(ui);
-                ui.separator();
+            let frame = egui::Frame {
+                fill: egui::Color32::from_rgba_unmultiplied(20, 20, 20, 230),
+                inner_margin: Margin::same(10i8),
+                ..Default::default()
+            };
 
-                self.show_rendering(ui);
-                ui.separator();
+            egui::SidePanel::left("side_panel")
+                .frame(frame)
+                .show(ctx, |ui| {
+                    self.show_network(ui);
+                    ui.separator();
 
-                self.show_render_info(ui);
-            });
+                    self.show_rendering(ui);
+                    ui.separator();
+
+                    self.show_render_info(ui);
+                });
         }
     }
 }
