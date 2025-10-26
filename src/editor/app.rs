@@ -247,6 +247,7 @@ impl MirrorApp {
         ui.heading(RichText::new("Render Info").color(Color32::LIGHT_GRAY));
 
         TableBuilder::new(ui)
+            .id_salt("render_info")
             .striped(true)
             .resizable(false)
             .cell_layout(egui::Layout::left_to_right(egui::Align::Min))
