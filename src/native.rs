@@ -38,10 +38,7 @@ impl FormatTime for CustomTime {
 }
 
 pub fn main() -> anyhow::Result<()> {
-    // println!("{}", spherical_to_cartesian(Vec3::new(1.0, PI, 0.0)));
-
     // Create tokio runtime.
-    // let runtime = tokio::runtime::Runtime::new()?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(
             thread::available_parallelism()

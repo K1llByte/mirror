@@ -29,6 +29,9 @@
 with the node via websockets.
 
 ## Improved scheduler
+- Backend abstraction
+    - Use rayon crate's thread pool for the rendering cpu bound work
+    - The protocol part will still use tokio runtime
 - Scheduler that considers node latency and performance score
 - Scheduler that distributes workload based on local performance
 

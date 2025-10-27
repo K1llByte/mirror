@@ -27,3 +27,10 @@ web-sys = "0.3.81"
 wasm-bindgen-futures = "0.4.54"
 eframe = "0.32.3"
 log = "0.4.28"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+tokio = { version = "1.47.1", features = ["rt", "io-util", "macros", "sync"] }
+chrono = "0.4.42"
+egui_extras = { version = "0.32.3", features = ["default", "image"] }
+glam = { version = "0.30.6", features = ["serde"] }
+tracing-wasm = "0.2.1"

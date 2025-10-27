@@ -7,7 +7,7 @@ use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::raytracer::Scene;
-use crate::raytracer::{Image, Tile};
+use crate::raytracer::Tile;
 
 #[derive(Debug, Clone, Copy, Encode, Decode)]
 pub struct TileRenderWork {
