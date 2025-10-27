@@ -2,17 +2,8 @@
 name = "mirror"
 version = "0.1.0"
 edition = "2024"
-default-run = "native"
 
-[[bin]]
-name = "web"
-path = "src/web.rs"
-
-[[bin]]
-name = "native"
-path = "src/main.rs"
-
-[dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 anyhow = "1.0.99"
 async-channel = "2.5.0"
 bincode = { version = "2.0.1", features = ["derive", "serde"] }
@@ -30,3 +21,9 @@ tokio = { version = "1.47.1", features = ["full", "tracing"] }
 toml = "0.9.6"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = "0.3.81"
+wasm-bindgen-futures = "0.4.54"
+eframe = "0.32.3"
+log = "0.4.28"

@@ -1,11 +1,10 @@
 use core::f32;
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use glam::Vec3;
 use rand::Rng;
 
-use mirror::raytracer::{BvhNode, Camera, Geometry, Material, Model, Scene};
-use tracing::debug;
+use crate::raytracer::{Camera, Geometry, Material, Model, Scene};
 
 pub fn spheres_scene(cam_aspect_ratio: f32) -> Scene {
     // Spheres
