@@ -5,6 +5,7 @@
 
 # Todo
 ## Simple path tracer - v1.0
+- [ ] Scene selector
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
 - [ ] Direct light sampling
 - [ ] BSDF refactor

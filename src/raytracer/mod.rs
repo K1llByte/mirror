@@ -5,6 +5,7 @@ pub mod camera;
 pub mod image;
 pub mod material;
 pub mod ray;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod renderer;
 pub mod scene;
 
@@ -15,5 +16,6 @@ pub use camera::*;
 pub use image::*;
 pub use material::*;
 pub use ray::*;
+#[cfg(not(target_arch = "wasm32"))]
 pub use renderer::*;
 pub use scene::*;

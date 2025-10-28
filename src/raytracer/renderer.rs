@@ -17,8 +17,11 @@ use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::protocol::{MirrorPacket, PeerTable, TileRenderWork};
 use crate::raytracer::{AccumulatedImage, Hittable, Ray, Scene, Tile};
+use crate::{
+    protocol::{MirrorPacket, PeerTable, TileRenderWork},
+    utils,
+};
 
 pub struct Renderer {
     pub peer_table: PeerTable,
@@ -344,9 +347,7 @@ pub async fn render_task(
     let (work_send_queue, work_recv_queue) = async_channel::unbounded::<TileRenderWork>();
 
     let num_remote_tasks = renderer.peer_table.read().await.len();
-    let num_processors = thread::available_parallelism()
-        .map(NonZero::get)
-        .unwrap_or(1);
+    let num_processors = utils::ideal_processors();
     let num_local_tasks = max(
         num_processors - min(num_remote_tasks, num_processors / 2),
         1,

@@ -1,5 +1,6 @@
 use glam::Vec3;
 use rand::Rng;
+use std::num::NonZero;
 
 /// Convert cartesian into spherical coordinates
 pub fn cartesian_to_spherical(v: Vec3) -> Vec3 {
@@ -40,5 +41,19 @@ pub fn random_in_hemisphere(rng: &mut impl Rng, normal: Vec3) -> Vec3 {
         return vec;
     } else {
         return -vec;
+    }
+}
+
+pub fn ideal_processors() -> usize {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use std::thread;
+        thread::available_parallelism()
+            .map(NonZero::get)
+            .unwrap_or(1)
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        1
     }
 }
