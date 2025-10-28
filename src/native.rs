@@ -13,7 +13,7 @@ use tracing_subscriber::fmt::{format::Writer, time::FormatTime};
 
 use mirror::config::Config;
 use mirror::protocol::{Peer, listen_task};
-use mirror::raytracer::Renderer;
+use mirror::raytracer::{RenderBackend, Renderer};
 use mirror::test_scenes::*;
 
 #[derive(Parser)]
@@ -72,7 +72,11 @@ pub fn main() -> anyhow::Result<()> {
     };
 
     let peer_table = Arc::new(RwLock::new(HashMap::<SocketAddr, Peer>::new()));
-    let renderer = Arc::new(Renderer::new(peer_table.clone()));
+    let renderer = Arc::new(Renderer::new());
+    let render_backend = RenderBackend {
+        renderer,
+        peer_table,
+    };
     let scene = Arc::new({
         let aspect_ratio = 16.0 / 9.0;
         match args.scene.as_deref() {
@@ -90,7 +94,7 @@ pub fn main() -> anyhow::Result<()> {
     });
 
     let listen_task_future = runtime.spawn(listen_task(
-        renderer.clone(),
+        render_backend.clone(),
         config.host,
         config.bootstrap_peers,
     ));
@@ -103,7 +107,7 @@ pub fn main() -> anyhow::Result<()> {
             Box::new(|_| {
                 Ok(Box::new(editor::MirrorApp::new(
                     runtime,
-                    renderer.clone(),
+                    render_backend,
                     scene,
                 )))
             }),

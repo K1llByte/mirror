@@ -6,14 +6,7 @@ use bincode::{Decode, Encode, config, decode_from_slice};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::raytracer::Scene;
-use crate::raytracer::Tile;
-
-#[derive(Debug, Clone, Copy, Encode, Decode)]
-pub struct TileRenderWork {
-    pub begin_pos: (usize, usize),
-    pub tile_size: (usize, usize),
-}
+use crate::raytracer::{Scene, Tile, TileRenderWork};
 
 /// Represents the main control packet used in the peer-to-peer network.
 #[derive(Debug, Encode, Decode)]

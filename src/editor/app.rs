@@ -10,12 +10,12 @@ use futures::FutureExt;
 use image::{ImageBuffer, RgbImage};
 use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
 
-use crate::raytracer::{self, AccumulatedImage, RenderInfo, Renderer, Scene};
+use crate::raytracer::{self, AccumulatedImage, RenderBackend, RenderInfo, Renderer, Scene};
 
 pub struct MirrorApp {
     // Backend data
     runtime: Runtime,
-    renderer: Arc<Renderer>,
+    render_backend: RenderBackend,
     render_image: Arc<RwLock<AccumulatedImage>>,
     scene: Arc<Scene>,
 
@@ -36,12 +36,12 @@ pub struct MirrorApp {
 }
 
 impl MirrorApp {
-    pub fn new(runtime: Runtime, renderer: Arc<Renderer>, scene: Arc<Scene>) -> Self {
+    pub fn new(runtime: Runtime, render_backend: RenderBackend, scene: Arc<Scene>) -> Self {
         let framebuffer_size = (400, 400);
         Self {
             // Backend data
             runtime,
-            renderer,
+            render_backend,
             render_image: Arc::new(RwLock::new(AccumulatedImage::new(framebuffer_size))),
             scene,
             // Ui data
@@ -59,7 +59,7 @@ impl MirrorApp {
 
     fn spawn_render_task(&mut self) {
         self.render_join_handle = Some(self.runtime.spawn(raytracer::render_task(
-            self.renderer.clone(),
+            self.render_backend.clone(),
             self.render_image.clone(),
             self.scene.clone(),
             self.samples_per_pixel,
@@ -115,7 +115,7 @@ impl MirrorApp {
         // NOTE: Since Im using try_lock to get peers info to avoid blocking
         // ui task, I use a Vec to cache the info when its not possible to get
         // the lock guard.
-        if let Ok(peer_table_guard) = self.renderer.peer_table.try_read() {
+        if let Ok(peer_table_guard) = self.render_backend.peer_table.try_read() {
             self.cached_peers_info = peer_table_guard
                 .keys()
                 .map(|a| (peer_table_guard.get(a).unwrap().name.clone(), a.to_string()))

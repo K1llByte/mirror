@@ -14,7 +14,7 @@ use tokio::time;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::protocol::{MirrorPacket, PacketError};
-use crate::raytracer::{Renderer, Scene, Tile};
+use crate::raytracer::{RenderBackend, Renderer, Scene, Tile};
 
 pub type PeerTable = Arc<RwLock<HashMap<SocketAddr, Peer>>>;
 
@@ -28,7 +28,7 @@ pub struct Peer {
 /// Listen task, responsible for connecting to bootstrap peers and handling new
 /// incomming connections and spawning new peer tasks.
 pub async fn listen_task(
-    renderer: Arc<Renderer>,
+    render_backend: RenderBackend,
     host: impl ToSocketAddrs + Display,
     bootstrap_peers: Vec<SocketAddr>,
 ) -> io::Result<()> {
@@ -39,19 +39,19 @@ pub async fn listen_task(
 
     // Connect to bootstrap peers.
     info!("Connecting to bootstrap peers ...");
-    connect_to_peers(bootstrap_peers, renderer.clone(), listen_port).await;
+    connect_to_peers(bootstrap_peers, render_backend.clone(), listen_port).await;
 
     loop {
         // Handle incoming connections.
         let (socket, _) = listener.accept().await?;
         // Dispatch into a separate task.
-        tokio::spawn(peer_task(renderer.clone(), socket, listen_port));
+        tokio::spawn(peer_task(render_backend.clone(), socket, listen_port));
     }
 }
 
 pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
     peers: P,
-    renderer: Arc<Renderer>,
+    render_backend: RenderBackend,
     listen_port: u16,
 ) {
     // TODO: Do the trick of spawning multiple tasks at once and join them immediatelly
@@ -66,7 +66,7 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
             continue;
         }
         // Refuse duplicate connections
-        if renderer
+        if render_backend
             .peer_table
             .read()
             .await
@@ -85,12 +85,12 @@ pub async fn connect_to_peers<P: IntoIterator<Item = impl Into<SocketAddr>>>(
             continue;
         };
         // Dispatch into a separate task.
-        tokio::spawn(peer_task(renderer.clone(), socket, listen_port));
+        tokio::spawn(peer_task(render_backend.clone(), socket, listen_port));
     }
 }
 
 pub fn peer_task(
-    renderer: Arc<Renderer>,
+    render_backend: RenderBackend,
     socket: TcpStream,
     listen_port: u16,
 ) -> impl Future<Output = ()> + Send {
@@ -117,7 +117,7 @@ pub fn peer_task(
 
         let (tile_send_queue, tile_recv_queue) = async_channel::unbounded();
         {
-            let mut peer_table_guard = renderer.peer_table.write().await;
+            let mut peer_table_guard = render_backend.peer_table.write().await;
             // Refuse self connections
             if peer_listen_address == local_listen_address {
                 info!("Trying to connect to self '{peer_listen_address}'. Refused handshake.");
@@ -172,7 +172,7 @@ pub fn peer_task(
                         "{} requested to connect to {:?}",
                         peer_listen_port, new_peers
                     );
-                    connect_to_peers(new_peers, renderer.clone(), listen_port).await;
+                    connect_to_peers(new_peers, render_backend.clone(), listen_port).await;
                 }
                 Ok(MirrorPacket::SyncScene(received_scene)) => {
                     scene = Some(received_scene);
@@ -190,7 +190,7 @@ pub fn peer_task(
                     assert!(!tiles.is_empty());
                     let mut tiles_res = Vec::with_capacity(tiles.len());
                     for tile in tiles {
-                        tiles_res.push(renderer.render_tile(
+                        tiles_res.push(render_backend.renderer.render_tile(
                             scene.as_ref().unwrap(),
                             samples_per_pixel,
                             tile.begin_pos,
@@ -201,7 +201,7 @@ pub fn peer_task(
                     let render_time = timer.elapsed().as_millis();
                     trace!("RenderTileRequest render time: {render_time} ms");
 
-                    let mut peer_table_guard = renderer.peer_table.write().await;
+                    let mut peer_table_guard = render_backend.peer_table.write().await;
                     let peer = peer_table_guard
                         .get_mut(&peer_listen_address)
                         .expect("Should be available while this tasks runs");
@@ -230,7 +230,7 @@ pub fn peer_task(
             }
         }
 
-        renderer
+        render_backend
             .peer_table
             .write()
             .await
