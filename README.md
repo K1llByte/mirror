@@ -5,7 +5,7 @@
 
 A physically based path tracer designed to render locally or using a P2P overlay network for distributed rendering.
 
-![](showcase.png)
+![](images/showcase.png)
 
 ## Getting Started
 ### Install

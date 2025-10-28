@@ -10,7 +10,7 @@ use futures::FutureExt;
 use image::{ImageBuffer, RgbImage};
 use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
 
-use crate::raytracer::{self, AccumulatedImage, RenderBackend, RenderInfo, Renderer, Scene};
+use crate::raytracer::{self, AccumulatedImage, RenderBackend, RenderInfo, Scene};
 
 pub struct MirrorApp {
     // Backend data

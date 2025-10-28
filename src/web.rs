@@ -9,16 +9,7 @@ use eframe::egui::{
     load::Bytes,
 };
 use egui_extras::{Column, TableBuilder};
-
-#[derive(Default)]
-pub struct RenderInfo {
-    pub total_samples: usize,
-    pub total_time: u128,
-    pub last_samples: usize,
-    pub last_time: u128,
-    pub total_avg_time_per_sample: u128,
-    pub last_avg_time_per_sample: u128,
-}
+use mirror::raytracer::RenderInfo;
 
 #[derive(Default)]
 struct TestApp {

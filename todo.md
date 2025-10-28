@@ -23,11 +23,7 @@
   - [ ] Code documentation
 
 ## Web client
-- [ ] New egui interface that compiles to webassembly
-- [ ] Experiment with tokio for webassembly
-- New option to create a web server instead of a native client.
-- Webserver will provide the webassembly compiled version of egui that will communicate
-with the node via websockets.
+- [ ] Rewrite protocol abstraction to be able to work with websockets and os sockets simultaniously
 
 ## Improved scheduler
 - Backend abstraction
@@ -116,3 +112,8 @@ to work on it
 - [x] Button to save rendered image to file
 - [x] Cuboid
 - [x] Send multiple tiles to render in the same render tile request packet
+
+## Web client
+- [x] New egui interface that compiles to webassembly
+- [x] Experiment with tokio for webassembly
+- [x] New option to compile to wasm instead of a native.
