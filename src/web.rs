@@ -9,7 +9,11 @@ use eframe::egui::{
     load::Bytes,
 };
 use egui_extras::{Column, TableBuilder};
+use mirror::editor::MirrorApp;
 use mirror::raytracer::RenderInfo;
+use mirror::raytracer::{RenderBackend, Renderer};
+use mirror::test_scenes::cornell_box2_scene;
+use std::sync::Arc;
 
 #[derive(Default)]
 struct TestApp {
@@ -267,6 +271,17 @@ pub fn main() {
 
     let web_options = eframe::WebOptions::default();
 
+    let renderer = Arc::new(Renderer::new());
+    let render_backend = RenderBackend { renderer };
+    let scene = Arc::new(cornell_box2_scene(16.0 / 9.0));
+
+    wasm_bindgen_futures::spawn_local(async {
+        tracing::warn!("wasm_bindgen_futures::spawn_local!");
+    });
+    runtime.spawn(async {
+        tracing::warn!("runtime.spawn!");
+    });
+
     wasm_bindgen_futures::spawn_local(async {
         let document = web_sys::window()
             .expect("No window")
@@ -283,7 +298,8 @@ pub fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(TestApp::new(cc)))),
+                Box::new(|cc| Ok(Box::new(MirrorApp::new(runtime, render_backend, scene)))),
+                // Box::new(|cc| Ok(Box::new(TestApp::new(cc)))),
             )
             .await;
     });

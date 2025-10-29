@@ -5,6 +5,7 @@
 
 # Todo
 ## Simple path tracer - v1.0
+- [ ] Rendering progress bar
 - [ ] Scene selector
 - [ ] Avoid sending scene on every render request, for progressive rendering this will avoid synchronizing while the scene did not change
 - [ ] Direct light sampling
@@ -42,11 +43,8 @@
 ## Unsorted
 - [ ] connect_to_peers methods should connect to all at the same time
 
-- [ ] Github CI workflows
-    - [ ] Create a dev branch and always active work there
-    - [ ] CI that checks unit tests
-    - [ ] CI that checks clippy before merging into a releases branch
-    - [ ] CI that builds a gh-pages branch that deploys webassembly generated project to the web
+- [ ] CI that checks unit tests
+- [ ] CI that checks clippy before merging into a releases branch
 - [ ] PeerTable should store peer data as Arc<Mutex<Peer>> instead of current approach
 - [ ] Implement some image denoising algorithm such as bilateral filter
 - [ ] Fix problem that when sample count is low (1 sample) the light seems to be darker
@@ -117,3 +115,8 @@ to work on it
 - [x] New egui interface that compiles to webassembly
 - [x] Experiment with tokio for webassembly
 - [x] New option to compile to wasm instead of a native.
+
+
+## Unsorted
+- [x] Create a dev branch and always active work there
+- [x] CI that builds a gh-pages branch that deploys webassembly generated project to the web

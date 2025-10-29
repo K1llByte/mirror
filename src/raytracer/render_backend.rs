@@ -49,6 +49,7 @@ async fn local_render_tile_task(
     };
     loop {
         // Receive work
+        // info!("About to receive render work");
         if let Ok(tile_render_work) = work_recv_queue.recv().await {
             // Do work
             let tile = render_backend.renderer.render_tile(
@@ -271,8 +272,9 @@ pub async fn render_task(
     scene: Arc<Scene>,
     samples_per_pixel: usize,
 ) -> RenderInfo {
+    tracing::info!("In render_task");
     // Measure execution time from here
-    let render_time = Instant::now();
+    // let render_time = Instant::now();
 
     const RENDER_TILE_MAX_SIZE: (usize, usize) = (64, 64);
     let image_size = render_image.read().await.size();
@@ -304,6 +306,7 @@ pub async fn render_task(
 
     let mut join_handles = Vec::with_capacity(num_local_tasks + num_remote_tasks);
 
+    tracing::info!("Before dispatching local render tasks");
     // Dispatch work tasks:
     // - Local render_tile tasks: An amount of CPU cores.
     for _ in 0..num_local_tasks {
@@ -363,11 +366,12 @@ pub async fn render_task(
     }
 
     // Log render time
-    let render_time = render_time.elapsed().as_millis();
-    info!(
-        "Rendered {} sample(s) in {} ms",
-        samples_per_pixel, render_time
-    );
+    let render_time = 0;
+    // let render_time = render_time.elapsed().as_millis();
+    // info!(
+    //     "Rendered {} sample(s) in {} ms",
+    //     samples_per_pixel, render_time
+    // );
 
     let total_avg_time_per_sample = render_time / samples_per_pixel as u128;
     RenderInfo {

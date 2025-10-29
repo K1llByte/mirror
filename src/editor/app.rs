@@ -58,12 +58,34 @@ impl MirrorApp {
     }
 
     fn spawn_render_task(&mut self) {
-        self.render_join_handle = Some(self.runtime.spawn(raytracer::render_task(
-            self.render_backend.clone(),
-            self.render_image.clone(),
-            self.scene.clone(),
-            self.samples_per_pixel,
-        )));
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.render_join_handle = Some(self.runtime.spawn(raytracer::render_task(
+                self.render_backend.clone(),
+                self.render_image.clone(),
+                self.scene.clone(),
+                self.samples_per_pixel,
+            )));
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            // wasm_bindgen_futures::spawn_local(async {
+            //     tracing::warn!("TRYING TO SPAWN RENDER TASK!");
+            // });
+            let render_backend_clone = self.render_backend.clone();
+            let render_image_clone = self.render_image.clone();
+            let scene_clone = self.scene.clone();
+            let samples_per_pixel = self.samples_per_pixel;
+            wasm_bindgen_futures::spawn_local(async move {
+                raytracer::render_task(
+                    render_backend_clone,
+                    render_image_clone,
+                    scene_clone,
+                    samples_per_pixel,
+                )
+                .await;
+            });
+        }
     }
 
     fn show_render_image(&mut self, ui: &mut egui::Ui) {
@@ -115,11 +137,14 @@ impl MirrorApp {
         // NOTE: Since Im using try_lock to get peers info to avoid blocking
         // ui task, I use a Vec to cache the info when its not possible to get
         // the lock guard.
-        if let Ok(peer_table_guard) = self.render_backend.peer_table.try_read() {
-            self.cached_peers_info = peer_table_guard
-                .keys()
-                .map(|a| (peer_table_guard.get(a).unwrap().name.clone(), a.to_string()))
-                .collect();
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Ok(peer_table_guard) = self.render_backend.peer_table.try_read() {
+                self.cached_peers_info = peer_table_guard
+                    .keys()
+                    .map(|a| (peer_table_guard.get(a).unwrap().name.clone(), a.to_string()))
+                    .collect();
+            }
         }
 
         if self.cached_peers_info.len() == 0 {
@@ -149,6 +174,7 @@ impl MirrorApp {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn save_render_image(&self, path: &str) {
         let render_image_guard = self.render_image.blocking_read();
         let (width, height) = render_image_guard.size();
@@ -219,6 +245,7 @@ impl MirrorApp {
             )
         });
         if render_button.clicked() {
+            tracing::info!("render_button.clicked");
             self.spawn_render_task();
         }
 
@@ -234,12 +261,15 @@ impl MirrorApp {
             // TODO: Explicit tasks cancelation (including all child tasks)
         }
 
-        let save_image_button =
-            ui.add_sized([ui.available_width(), 0.0], egui::Button::new("Save Image"));
-        if save_image_button.clicked() {
-            self.save_render_image(
-                format!("render_{}.png", Local::now().format("%Y%m%d_%H%M%S")).as_str(),
-            );
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let save_image_button =
+                ui.add_sized([ui.available_width(), 0.0], egui::Button::new("Save Image"));
+            if save_image_button.clicked() {
+                self.save_render_image(
+                    format!("render_{}.png", Local::now().format("%Y%m%d_%H%M%S")).as_str(),
+                );
+            }
         }
     }
 
