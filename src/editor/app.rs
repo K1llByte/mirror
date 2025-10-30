@@ -10,6 +10,9 @@ use futures::FutureExt;
 use image::{ImageBuffer, RgbImage};
 use tokio::{runtime::Runtime, sync::RwLock, task::JoinHandle};
 
+#[cfg(target_arch = "wasm32")]
+use futures::{FutureExt, future::RemoteHandle};
+
 use crate::raytracer::{self, AccumulatedImage, RenderBackend, RenderInfo, Scene};
 
 pub struct MirrorApp {
@@ -24,7 +27,10 @@ pub struct MirrorApp {
     // Background
     present_framebuffer: bool,
     texture: Option<egui::TextureHandle>,
+    #[cfg(not(target_arch = "wasm32"))]
     render_join_handle: Option<JoinHandle<RenderInfo>>,
+    #[cfg(target_arch = "wasm32")]
+    render_join_handle: Option<RemoteHandle<()>>,
     // Rendering
     progressive_rendering: bool,
     samples_per_pixel: usize,
@@ -69,14 +75,11 @@ impl MirrorApp {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            // wasm_bindgen_futures::spawn_local(async {
-            //     tracing::warn!("TRYING TO SPAWN RENDER TASK!");
-            // });
             let render_backend_clone = self.render_backend.clone();
             let render_image_clone = self.render_image.clone();
             let scene_clone = self.scene.clone();
             let samples_per_pixel = self.samples_per_pixel;
-            wasm_bindgen_futures::spawn_local(async move {
+            let (fut, handle): (_, RemoteHandle<_>) = async move {
                 raytracer::render_task(
                     render_backend_clone,
                     render_image_clone,
@@ -84,16 +87,28 @@ impl MirrorApp {
                     samples_per_pixel,
                 )
                 .await;
-            });
+            }
+            .remote_handle();
+            self.render_join_handle = Some(handle);
+            wasm_bindgen_futures::spawn_local(fut);
         }
     }
 
     fn show_render_image(&mut self, ui: &mut egui::Ui) {
-        let has_render_finished = self.render_join_handle.as_mut().is_some_and(|jh| {
-            jh.is_finished()
-                .then(|| self.render_info.merge(&jh.now_or_never().unwrap().unwrap()))
-                .is_some()
-        });
+        let has_render_finished = {
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                self.render_join_handle.as_mut().is_some_and(|jh| {
+                    jh.is_finished()
+                        .then(|| self.render_info.merge(&jh.now_or_never().unwrap().unwrap()))
+                        .is_some()
+                })
+            }
+            #[cfg(target_arch = "wasm32")]
+            {
+                self.render_join_handle.is_some_and(|rh| rh.is_finished())
+            }
+        };
         let texture: &TextureHandle = if has_render_finished || self.present_framebuffer {
             let (image_size, image_bytes): ([usize; 2], _) = {
                 let render_image_guard = self.render_image.blocking_read();
@@ -196,6 +211,7 @@ impl MirrorApp {
             .render_join_handle
             .as_ref()
             .is_some_and(|fut| !fut.is_finished());
+
         // Render button
         let render_button = ui.add_enabled(!is_rendering, |ui: &mut Ui| {
             TableBuilder::new(ui)

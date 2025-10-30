@@ -16,6 +16,7 @@ use std::{
     time::Instant,
 };
 use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
 use tracing::{error, info, trace};
 
 #[derive(Clone)]
@@ -272,9 +273,8 @@ pub async fn render_task(
     scene: Arc<Scene>,
     samples_per_pixel: usize,
 ) -> RenderInfo {
-    tracing::info!("In render_task");
     // Measure execution time from here
-    // let render_time = Instant::now();
+    let render_start = utils::instant_now();
 
     const RENDER_TILE_MAX_SIZE: (usize, usize) = (64, 64);
     let image_size = render_image.read().await.size();
@@ -304,13 +304,13 @@ pub async fn render_task(
         1,
     );
 
-    let mut join_handles = Vec::with_capacity(num_local_tasks + num_remote_tasks);
+    let mut local_handles = Vec::with_capacity(num_local_tasks);
+    let mut remote_handles: Vec<JoinHandle<()>> = Vec::with_capacity(num_remote_tasks);
 
-    tracing::info!("Before dispatching local render tasks");
     // Dispatch work tasks:
     // - Local render_tile tasks: An amount of CPU cores.
     for _ in 0..num_local_tasks {
-        join_handles.push(tokio::spawn(local_render_tile_task(
+        local_handles.push(utils::spawn(local_render_tile_task(
             work_send_queue.clone(),
             work_recv_queue.clone(),
             remaining_tiles.clone(),
@@ -324,7 +324,7 @@ pub async fn render_task(
     {
         // - Remote render_tile tasks: As many as connected peers.
         for peer_listen_address in render_backend.peer_table.read().await.keys().cloned() {
-            join_handles.push(tokio::spawn(remote_render_tile_task(
+            remote_handles.push(utils::spawn(remote_render_tile_task(
                 work_send_queue.clone(),
                 work_recv_queue.clone(),
                 remaining_tiles.clone(),
@@ -359,19 +359,22 @@ pub async fn render_task(
     }
 
     // Join all work task handles
-    future::join_all(join_handles).await;
+    future::join(
+        future::join_all(local_handles),
+        future::join_all(remote_handles),
+    )
+    .await;
 
     {
         render_image.write().await.times_sampled += samples_per_pixel;
     }
 
     // Log render time
-    let render_time = 0;
-    // let render_time = render_time.elapsed().as_millis();
-    // info!(
-    //     "Rendered {} sample(s) in {} ms",
-    //     samples_per_pixel, render_time
-    // );
+    let render_time = (utils::instant_now() - render_start) as u128;
+    info!(
+        "Rendered {} sample(s) in {} ms",
+        samples_per_pixel, render_time
+    );
 
     let total_avg_time_per_sample = render_time / samples_per_pixel as u128;
     RenderInfo {

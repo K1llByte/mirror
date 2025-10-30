@@ -1,6 +1,10 @@
+#[cfg(target_arch = "wasm32")]
+use futures::{FutureExt, future::RemoteHandle};
 use glam::Vec3;
 use rand::Rng;
 use std::num::NonZero;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::task::JoinHandle;
 
 /// Convert cartesian into spherical coordinates
 pub fn cartesian_to_spherical(v: Vec3) -> Vec3 {
@@ -56,4 +60,40 @@ pub fn ideal_processors() -> usize {
     {
         1
     }
+}
+
+pub fn instant_now() -> f64 {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use std::time::Instant;
+        static START: once_cell::sync::Lazy<Instant> = once_cell::sync::Lazy::new(Instant::now);
+        START.elapsed().as_secs_f64() * 1000.0
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        web_sys::window().unwrap().performance().unwrap().now()
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn spawn<F>(future: F) -> JoinHandle<F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    tokio::spawn(future)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn spawn<F>(future: F) -> RemoteHandle<()>
+where
+    F: Future + FutureExt + Send + 'static,
+    F::Output: Send + 'static,
+{
+    let (fut, handle): (_, RemoteHandle<_>) = async {
+        future.await;
+    }
+    .remote_handle();
+    wasm_bindgen_futures::spawn_local(fut);
+    handle
 }
