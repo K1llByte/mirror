@@ -9,7 +9,7 @@ use eframe::egui::{
     load::Bytes,
 };
 use egui_extras::{Column, TableBuilder};
-use mirror::editor::MirrorApp;
+// use mirror::editor::MirrorApp;
 use mirror::raytracer::RenderInfo;
 use mirror::raytracer::{RenderBackend, Renderer};
 use mirror::test_scenes::cornell_box2_scene;
@@ -298,8 +298,8 @@ pub fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(MirrorApp::new(runtime, render_backend, scene)))),
-                // Box::new(|cc| Ok(Box::new(TestApp::new(cc)))),
+                // Box::new(|cc| Ok(Box::new(MirrorApp::new(runtime, render_backend, scene)))),
+                Box::new(|cc| Ok(Box::new(TestApp::new(cc)))),
             )
             .await;
     });

@@ -1,6 +1,6 @@
 #[cfg(not(target_arch = "wasm32"))]
 pub mod config;
-// #[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod editor;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod protocol;
